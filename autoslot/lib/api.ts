@@ -1,10 +1,8 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import type { ApiErrorResponse } from '@/lib/api-error'
+import axios, {
+  type AxiosError,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 
-/**
- * Общий axios-инстанс для запросов к API autoSlot.
- * Базовый URL задаётся через переменную окружения NEXT_PUBLIC_API_URL.
- */
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
   withCredentials: true,
@@ -14,7 +12,9 @@ export const api = axios.create({
   },
 })
 
-type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean }
+type RetryableRequest = InternalAxiosRequestConfig & {
+  _retry?: boolean
+}
 
 const refreshExcludedPaths = [
   'auth/login',
@@ -24,9 +24,31 @@ const refreshExcludedPaths = [
 
 let refreshPromise: Promise<void> | null = null
 let unauthorizedHandler: (() => void) | null = null
+let refreshSuccessHandler: (() => void) | null = null
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler
+}
+
+export function setRefreshSuccessHandler(handler: (() => void) | null) {
+  refreshSuccessHandler = handler
+}
+
+export function refreshAccessToken(): Promise<void> {
+  refreshPromise ??= api
+    .post('auth/refresh-tokens')
+    .then(() => {
+      refreshSuccessHandler?.()
+    })
+    .catch((refreshError) => {
+      unauthorizedHandler?.()
+      throw refreshError
+    })
+    .finally(() => {
+      refreshPromise = null
+    })
+
+  return refreshPromise
 }
 
 function isRefreshExcluded(url?: string) {
@@ -35,15 +57,13 @@ function isRefreshExcluded(url?: string) {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError<ApiErrorResponse>) => {
+  async (error: AxiosError) => {
     const request = error.config as RetryableRequest | undefined
-    const errorCode = error.response?.data?.errors?.[0]?.code
 
     if (
       !request ||
       request._retry ||
       error.response?.status !== 401 ||
-      errorCode !== 'TOKEN_EXPIRED' ||
       isRefreshExcluded(request.url)
     ) {
       return Promise.reject(error)
@@ -51,18 +71,12 @@ api.interceptors.response.use(
 
     request._retry = true
 
-    refreshPromise ??= api
-      .post('auth/refresh-tokens')
-      .then(() => undefined)
-      .catch((refreshError) => {
-        unauthorizedHandler?.()
-        throw refreshError
-      })
-      .finally(() => {
-        refreshPromise = null
-      })
+    try {
+      await refreshAccessToken()
+    } catch {
+      return Promise.reject(error)
+    }
 
-    await refreshPromise
     return api(request)
   },
 )

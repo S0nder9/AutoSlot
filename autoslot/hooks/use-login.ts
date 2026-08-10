@@ -73,7 +73,7 @@ export function useLogin() {
       toast.success('Вход выполнен', {
         description: 'Вы успешно вошли в аккаунт.',
       })
-      router.replace('/')
+      router.replace('/dashboard/profile')
     } catch (requestError) {
       if (!isAxiosError(requestError)) {
         showLoginError(['Произошла непредвиденная ошибка. Попробуйте снова.'])

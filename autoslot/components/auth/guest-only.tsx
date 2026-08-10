@@ -10,7 +10,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace('/')
+      router.replace('/dashboard/profile')
     }
   }, [isAuthenticated, isLoading, router])
 

@@ -168,3 +168,56 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .rbc-calendar {
+    @apply text-sm text-foreground;
+  }
+
+  .rbc-event {
+    @apply cursor-pointer;
+  }
+
+  .rbc-toolbar {
+    @apply mb-4 gap-3;
+  }
+
+  .rbc-toolbar button {
+    @apply border-border bg-background text-foreground;
+  }
+
+  .rbc-toolbar button:hover,
+  .rbc-toolbar button:focus,
+  .rbc-toolbar button.rbc-active {
+    @apply border-primary bg-primary text-primary-foreground shadow-none;
+  }
+
+  .rbc-month-view,
+  .rbc-time-view,
+  .rbc-agenda-view table.rbc-agenda-table {
+    @apply border-border;
+  }
+
+  .rbc-header,
+  .rbc-day-bg,
+  .rbc-time-content,
+  .rbc-timeslot-group,
+  .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+    @apply border-border;
+  }
+
+  .rbc-off-range-bg,
+  .rbc-today {
+    @apply bg-muted/60;
+  }
+
+  @media (max-width: 640px) {
+    .rbc-toolbar {
+      @apply flex-col items-stretch;
+    }
+
+    .rbc-toolbar-label {
+      @apply py-2 text-center;
+    }
+  }
+}

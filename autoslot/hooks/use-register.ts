@@ -1,7 +1,7 @@
 'use client'
 
 import { isAxiosError } from 'axios'
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -34,21 +34,8 @@ export function useRegister() {
   const [form, setForm] = useState<RegisterForm>(initialForm)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
-  const [isRegistered, setIsRegistered] = useState(false)
   const router = useRouter()
-  const { register } = useAuth()
-
-  useEffect(() => {
-    if (!isRegistered) {
-      return
-    }
-
-    const timer = window.setTimeout(() => {
-      router.replace('/auth/login')
-    }, 2000)
-
-    return () => window.clearTimeout(timer)
-  }, [isRegistered, router])
+  const { login, register } = useAuth()
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target
@@ -86,7 +73,21 @@ export function useRegister() {
       toast.success('Аккаунт создан', {
         description: 'Регистрация прошла успешно.',
       })
-      setIsRegistered(true)
+
+      try {
+        await login(result.data.username, result.data.password)
+        router.replace('/dashboard/profile')
+      } catch (loginError) {
+        const message =
+          isAxiosError(loginError) && isApiErrorResponse(loginError.response?.data)
+            ? loginError.response.data.errors[0]?.message
+            : null
+
+        toast.error('Не удалось войти автоматически', {
+          description: message ?? 'Войдите в созданный аккаунт вручную.',
+        })
+        router.replace('/auth/login')
+      }
     } catch (requestError) {
       if (!isAxiosError(requestError)) {
         showRegistrationError(['Произошла непредвиденная ошибка. Попробуйте снова.'])
