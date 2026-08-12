@@ -1,7 +1,8 @@
 'use client'
 
+import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Plus } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { CreateEventDialog } from '@/components/calendar/create-event-dialog'
 import { EventDetailsDialog } from '@/components/calendar/event-details-dialog'
 import { EventsCalendar } from '@/components/calendar/events-calendar'
@@ -9,11 +10,46 @@ import { Button } from '@/components/ui/button'
 import { useEventDialog } from '@/hooks/use-event-dialog'
 import { useEventDetails } from '@/hooks/use-event-details'
 import { useSelectedCalendar } from '@/hooks/use-selected-calendar'
+import {
+  getCalendarRange,
+  type CalendarView,
+} from '@/lib/calendar-navigation'
 
-export function SelectedScheduleCalendar({ scheduleId }: { scheduleId: string }) {
-  const calendar = useSelectedCalendar(scheduleId)
+type SelectedScheduleCalendarProps = {
+  scheduleId: string
+  initialDate: Date
+  initialView: CalendarView
+  onCalendarStateChange: (date: Date, view: CalendarView) => void
+}
+
+export function SelectedScheduleCalendar({
+  scheduleId,
+  initialDate,
+  initialView,
+  onCalendarStateChange,
+}: SelectedScheduleCalendarProps) {
+  const [date, setDate] = useState(initialDate)
+  const [view, setView] = useState(initialView)
+  const visibleRange = useMemo(() => getCalendarRange(date, view), [date, view])
+  const calendar = useSelectedCalendar(scheduleId, visibleRange)
   const dialog = useEventDialog()
   const details = useEventDetails(scheduleId)
+
+  const handleNavigate = useCallback(
+    (nextDate: Date) => {
+      setDate(nextDate)
+      onCalendarStateChange(nextDate, view)
+    },
+    [onCalendarStateChange, view],
+  )
+
+  const handleViewChange = useCallback(
+    (nextView: CalendarView) => {
+      setView(nextView)
+      onCalendarStateChange(date, nextView)
+    },
+    [date, onCalendarStateChange],
+  )
 
   if (calendar.isLoading) {
     return (
@@ -44,10 +80,22 @@ export function SelectedScheduleCalendar({ scheduleId }: { scheduleId: string })
             <p className="text-sm text-muted-foreground">Планирование записей автосервиса</p>
           </div>
         </div>
-        <Button onClick={dialog.open}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={calendar.isEventsFetching}
+            onClick={() => void calendar.refreshEvents()}
+          >
+            <RefreshCw
+              className={calendar.isEventsFetching ? 'animate-spin' : undefined}
+            />
+            Обновить
+          </Button>
+          <Button onClick={dialog.open}>
           <Plus />
           Создать событие
-        </Button>
+          </Button>
+        </div>
       </div>
 
       <div className="relative overflow-hidden rounded-xl border bg-background p-3 shadow-sm sm:p-5">
@@ -57,8 +105,11 @@ export function SelectedScheduleCalendar({ scheduleId }: { scheduleId: string })
           </div>
         )}
         <EventsCalendar
+          date={date}
+          view={view}
           events={calendar.events}
-          onRangeChange={calendar.handleRangeChange}
+          onNavigate={handleNavigate}
+          onView={handleViewChange}
           onSelectEvent={details.open}
         />
       </div>

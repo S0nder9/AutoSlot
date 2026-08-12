@@ -5,6 +5,7 @@ import './globals.css'
 import { cn } from "@/lib/utils";
 import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/components/auth/auth-provider'
+import { QueryProvider } from '@/components/providers/query-provider'
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -30,7 +31,9 @@ export default function RootLayout({
   return (
     <html lang="ru" className={cn("bg-background", "font-sans", geist.variable)}>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <QueryProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </QueryProvider>
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

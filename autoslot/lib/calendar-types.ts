@@ -3,12 +3,24 @@ import type { Schedule } from '@/lib/schedule-types'
 export type ScheduleEvent = {
   id: string
   title: string
-  description?: string | null
-  color?: string | null
+  description: string | null
+  color: string
   startTime: string
   endTime: string
+  totalCost: number
   isPaid: boolean
-  jobs?: ScheduleEventJob[]
+  jobs: ScheduleEventJob[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type CalendarEventSummary = {
+  id: string
+  title: string
+  color: string
+  isPaid: boolean
+  startTime: string
+  endTime: string
 }
 
 export type ScheduleEventJob = {
@@ -22,9 +34,11 @@ export type ScheduleEventJob = {
 export type CalendarEvent = {
   id: string
   title: string
+  color: string
+  isPaid: boolean
   start: Date
   end: Date
-  resource: ScheduleEvent
+  resource: CalendarEventSummary
 }
 
 export type CalendarRange = {

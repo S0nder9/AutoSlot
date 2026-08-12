@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   api,
   refreshAccessToken,
@@ -42,6 +43,7 @@ export function AuthProvider({
 }: {
   children: ReactNode
 }) {
+  const queryClient = useQueryClient()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -73,8 +75,9 @@ export function AuthProvider({
 
   const clearLocalSession = useCallback(() => {
     clearRefreshTimer()
+    queryClient.clear()
     setUser(null)
-  }, [clearRefreshTimer])
+  }, [clearRefreshTimer, queryClient])
 
   const markAccessTokenAsFresh = useCallback(() => {
     lastRefreshAtRef.current = Date.now()

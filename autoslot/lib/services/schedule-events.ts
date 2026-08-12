@@ -1,6 +1,7 @@
 import { api } from '@/lib/api'
 import type { ApiResponse } from '@/lib/auth-types'
 import type {
+  CalendarEventSummary,
   CalendarRange,
   CreateEventPayload,
   ScheduleEvent,
@@ -12,8 +13,11 @@ export async function getSchedule(id: string) {
   return response.data.data
 }
 
-export async function getScheduleEvents(id: string, range: CalendarRange) {
-  const response = await api.get<ApiResponse<ScheduleEvent[]>>(
+export async function getScheduleEvents(
+  id: string,
+  range: CalendarRange,
+): Promise<CalendarEventSummary[]> {
+  const response = await api.get<ApiResponse<CalendarEventSummary[]>>(
     `schedules/${id}/events`,
     {
       params: {
