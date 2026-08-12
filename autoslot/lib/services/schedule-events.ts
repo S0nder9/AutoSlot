@@ -7,6 +7,8 @@ import type {
   ScheduleEvent,
   SelectedSchedule,
 } from '@/lib/calendar-types'
+import type { EventApiTimeRange } from '@/lib/event-date-time'
+import { serializeEventTimeRange } from '@/lib/event-date-time'
 
 export async function getSchedule(id: string) {
   const response = await api.get<ApiResponse<SelectedSchedule>>(`schedules/${id}`)
@@ -40,9 +42,42 @@ export async function createScheduleEvent(
   id: string,
   payload: CreateEventPayload,
 ) {
+  const timeRange = serializeEventTimeRange(payload.startTime, payload.endTime)
+
+  if (!timeRange) {
+    throw new Error('Invalid event time range')
+  }
+
   const response = await api.post<ApiResponse<ScheduleEvent>>(
     `schedules/${id}/events`,
-    payload,
+    {
+      ...payload,
+      ...timeRange,
+    },
   )
   return response.data.data
+}
+
+export async function updateScheduleEventTime(
+  scheduleId: string,
+  eventId: string,
+  timeRange: EventApiTimeRange,
+) {
+  const response = await api.patch<ApiResponse<CalendarEventSummary>>(
+    `schedules/${scheduleId}/events/${eventId}/time`,
+    timeRange,
+  )
+  const event = response.data.data
+  const confirmedTimeRange = event
+    ? serializeEventTimeRange(
+        new Date(event.startTime),
+        new Date(event.endTime),
+      )
+    : null
+
+  if (!event || !confirmedTimeRange) {
+    throw new Error('Invalid event time response')
+  }
+
+  return event
 }

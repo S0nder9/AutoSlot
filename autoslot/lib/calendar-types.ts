@@ -50,8 +50,8 @@ export type CreateEventPayload = {
   title: string
   description: string
   color: string
-  startTime: string
-  endTime: string
+  startTime: Date
+  endTime: Date
   isPaid: boolean
   jobs: []
 }

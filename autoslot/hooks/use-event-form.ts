@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 import type { CreateEventPayload } from '@/lib/calendar-types'
+import { parseLocalDateTime } from '@/lib/event-date-time'
 import {
   eventFormSchema,
   type EventFormValues,
@@ -65,12 +66,23 @@ export function useEventForm(
         return
       }
 
+      const startTime = parseLocalDateTime(result.data.startTime)
+      const endTime = parseLocalDateTime(result.data.endTime)
+
+      if (!startTime || !endTime || endTime.getTime() <= startTime.getTime()) {
+        setErrors((current) => ({
+          ...current,
+          endTime: 'Окончание должно быть позже начала.',
+        }))
+        return
+      }
+
       const payload: CreateEventPayload = {
         title: result.data.title,
         description: result.data.description,
         color: result.data.color,
-        startTime: new Date(result.data.startTime).toISOString(),
-        endTime: new Date(result.data.endTime).toISOString(),
+        startTime,
+        endTime,
         isPaid: result.data.isPaid,
         jobs: [],
       }

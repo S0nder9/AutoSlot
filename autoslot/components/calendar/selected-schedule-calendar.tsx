@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Plus, RefreshCw } from 'lucide-react'
+import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop'
 import { CreateEventDialog } from '@/components/calendar/create-event-dialog'
 import { EventDetailsDialog } from '@/components/calendar/event-details-dialog'
 import { EventsCalendar } from '@/components/calendar/events-calendar'
@@ -14,6 +15,7 @@ import {
   getCalendarRange,
   type CalendarView,
 } from '@/lib/calendar-navigation'
+import type { CalendarEvent } from '@/lib/calendar-types'
 
 type SelectedScheduleCalendarProps = {
   scheduleId: string
@@ -32,6 +34,7 @@ export function SelectedScheduleCalendar({
   const [view, setView] = useState(initialView)
   const visibleRange = useMemo(() => getCalendarRange(date, view), [date, view])
   const calendar = useSelectedCalendar(scheduleId, visibleRange)
+  const { moveEvent, pendingEventIds } = calendar
   const dialog = useEventDialog()
   const details = useEventDetails(scheduleId)
 
@@ -49,6 +52,13 @@ export function SelectedScheduleCalendar({
       onCalendarStateChange(date, nextView)
     },
     [date, onCalendarStateChange],
+  )
+
+  const handleEventDrop = useCallback(
+    ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+      moveEvent(event, start, end)
+    },
+    [moveEvent],
   )
 
   if (calendar.isLoading) {
@@ -111,6 +121,8 @@ export function SelectedScheduleCalendar({
           onNavigate={handleNavigate}
           onView={handleViewChange}
           onSelectEvent={details.open}
+          onEventDrop={handleEventDrop}
+          isEventDraggable={(event) => !pendingEventIds.has(event.id)}
         />
       </div>
 

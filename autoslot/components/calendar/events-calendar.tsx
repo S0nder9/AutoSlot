@@ -3,6 +3,8 @@
 import { CircleCheck } from 'lucide-react'
 import { Calendar, Views } from 'react-big-calendar'
 import type { EventProps, View } from 'react-big-calendar'
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
+import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop'
 import type { CalendarEvent } from '@/lib/calendar-types'
 import {
   CALENDAR_AGENDA_LENGTH,
@@ -14,6 +16,8 @@ import {
 } from '@/lib/calendar-localizer'
 import { calendarEventStyle } from '@/lib/calendar-event-style'
 
+const DragAndDropCalendar = withDragAndDrop<CalendarEvent>(Calendar)
+
 type EventsCalendarProps = {
   date: Date
   view: CalendarView
@@ -21,6 +25,8 @@ type EventsCalendarProps = {
   onNavigate: (date: Date) => void
   onView: (view: CalendarView) => void
   onSelectEvent: (event: CalendarEvent) => void
+  onEventDrop: (args: EventInteractionArgs<CalendarEvent>) => void
+  isEventDraggable: (event: CalendarEvent) => boolean
 }
 
 function CalendarEventContent({ event }: EventProps<CalendarEvent>) {
@@ -44,13 +50,15 @@ export function EventsCalendar({
   onNavigate,
   onView,
   onSelectEvent,
+  onEventDrop,
+  isEventDraggable,
 }: EventsCalendarProps) {
   const minTime = new Date();
   minTime.setHours(9, 0, 0);
   const maxTime = new Date();
   maxTime.setHours(19, 0, 0);
   return (
-    <Calendar<CalendarEvent>
+    <DragAndDropCalendar
       localizer={calendarLocalizer}
       culture="ru"
       events={events}
@@ -68,6 +76,11 @@ export function EventsCalendar({
       onNavigate={onNavigate}
       onView={(nextView: View) => onView(nextView as CalendarView)}
       onSelectEvent={onSelectEvent}
+      onEventDrop={onEventDrop}
+      draggableAccessor={(event) =>
+        view !== Views.AGENDA && isEventDraggable(event)
+      }
+      resizable={false}
       eventPropGetter={calendarEventStyle}
       popup
       className="min-h-[1000px]"
