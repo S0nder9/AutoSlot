@@ -56,4 +56,16 @@ export type CreateEventPayload = {
   jobs: []
 }
 
+export type EventFormPayload = Omit<CreateEventPayload, 'jobs'>
+
+export type UpdateEventJobPayload = {
+  jobId: string
+  employeeId: string
+  clientPrice: number
+}
+
+export type UpdateEventPayload = EventFormPayload & {
+  jobs: UpdateEventJobPayload[]
+}
+
 export type SelectedSchedule = Schedule

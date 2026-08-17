@@ -41,5 +41,9 @@ export function useEventDetails(scheduleId: string) {
     setEvent(null)
   }, [])
 
-  return { isOpen, isLoading, event, open, close }
+  const replace = useCallback((nextEvent: ScheduleEvent) => {
+    setEvent(nextEvent)
+  }, [])
+
+  return { isOpen, isLoading, event, open, close, replace }
 }

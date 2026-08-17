@@ -1,14 +1,18 @@
 'use client'
 
-import { addHours, format } from 'date-fns'
+import { addHours } from 'date-fns'
 import {
   type ChangeEvent,
   type FormEvent,
   useCallback,
+  useRef,
   useState,
 } from 'react'
-import type { CreateEventPayload } from '@/lib/calendar-types'
-import { parseLocalDateTime } from '@/lib/event-date-time'
+import type { EventFormPayload, ScheduleEvent } from '@/lib/calendar-types'
+import {
+  formatLocalDateTime,
+  parseLocalDateTime,
+} from '@/lib/event-date-time'
 import {
   eventFormSchema,
   type EventFormValues,
@@ -16,27 +20,52 @@ import {
 
 type EventFormErrors = Partial<Record<keyof EventFormValues, string>>
 
-function getInitialValues(): EventFormValues {
-  const start = new Date()
-  const end = addHours(start, 1)
-  const dateTimeFormat = "yyyy-MM-dd'T'HH:mm"
+export function getCreateEventFormInitialValues(
+  initialStart?: Date,
+  initialEnd?: Date,
+): EventFormValues {
+  const defaultStart = new Date()
+  const defaultEnd = addHours(defaultStart, 1)
+  const hasValidInitialRange =
+    initialStart !== undefined &&
+    initialEnd !== undefined &&
+    !Number.isNaN(initialStart.getTime()) &&
+    !Number.isNaN(initialEnd.getTime()) &&
+    initialEnd.getTime() > initialStart.getTime()
+  const start = hasValidInitialRange ? initialStart : defaultStart
+  const end = hasValidInitialRange ? initialEnd : defaultEnd
 
   return {
     title: '',
     description: '',
     color: '#3788d8',
-    startTime: format(start, dateTimeFormat),
-    endTime: format(end, dateTimeFormat),
+    startTime: formatLocalDateTime(start) ?? '',
+    endTime: formatLocalDateTime(end) ?? '',
     isPaid: false,
   }
 }
 
+export function getEventFormInitialValues(event: ScheduleEvent): EventFormValues {
+  return {
+    title: event.title,
+    description: event.description ?? '',
+    color: event.color,
+    startTime: formatLocalDateTime(event.startTime) ?? '',
+    endTime: formatLocalDateTime(event.endTime) ?? '',
+    isPaid: event.isPaid,
+  }
+}
+
 export function useEventForm(
-  onCreate: (payload: CreateEventPayload) => Promise<boolean>,
+  onSubmit: (payload: EventFormPayload) => Promise<boolean>,
   onSuccess: () => void,
+  initialValues?: EventFormValues,
 ) {
-  const [values, setValues] = useState(getInitialValues)
+  const [values, setValues] = useState<EventFormValues>(
+    () => initialValues ?? getCreateEventFormInitialValues(),
+  )
   const [errors, setErrors] = useState<EventFormErrors>({})
+  const isSubmittingRef = useRef(false)
 
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -54,6 +83,11 @@ export function useEventForm(
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
+
+      if (isSubmittingRef.current) {
+        return
+      }
+
       const result = eventFormSchema.safeParse(values)
 
       if (!result.success) {
@@ -77,19 +111,24 @@ export function useEventForm(
         return
       }
 
-      const payload: CreateEventPayload = {
+      const payload: EventFormPayload = {
         title: result.data.title,
         description: result.data.description,
         color: result.data.color,
         startTime,
         endTime,
         isPaid: result.data.isPaid,
-        jobs: [],
       }
 
-      if (await onCreate(payload)) onSuccess()
+      isSubmittingRef.current = true
+
+      try {
+        if (await onSubmit(payload)) onSuccess()
+      } finally {
+        isSubmittingRef.current = false
+      }
     },
-    [onCreate, onSuccess, values],
+    [onSubmit, onSuccess, values],
   )
 
   return { values, errors, handleChange, handlePaidChange, handleSubmit }

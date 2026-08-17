@@ -1,9 +1,15 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Plus, RefreshCw } from 'lucide-react'
-import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop'
+import { toast } from 'sonner'
+import type {
+  DragDirection,
+  EventInteractionArgs,
+  OnDragStartArgs,
+} from 'react-big-calendar/lib/addons/dragAndDrop'
+import type { SlotInfo } from 'react-big-calendar'
 import { CreateEventDialog } from '@/components/calendar/create-event-dialog'
 import { EventDetailsDialog } from '@/components/calendar/event-details-dialog'
 import { EventsCalendar } from '@/components/calendar/events-calendar'
@@ -12,6 +18,7 @@ import { useEventDialog } from '@/hooks/use-event-dialog'
 import { useEventDetails } from '@/hooks/use-event-details'
 import { useSelectedCalendar } from '@/hooks/use-selected-calendar'
 import {
+  CALENDAR_TIME_STEP_MINUTES,
   getCalendarRange,
   type CalendarView,
 } from '@/lib/calendar-navigation'
@@ -24,6 +31,11 @@ type SelectedScheduleCalendarProps = {
   onCalendarStateChange: (date: Date, view: CalendarView) => void
 }
 
+type SelectedCreateRange = {
+  start: Date
+  end: Date
+}
+
 export function SelectedScheduleCalendar({
   scheduleId,
   initialDate,
@@ -32,11 +44,32 @@ export function SelectedScheduleCalendar({
 }: SelectedScheduleCalendarProps) {
   const [date, setDate] = useState(initialDate)
   const [view, setView] = useState(initialView)
+  const [selectedCreateRange, setSelectedCreateRange] =
+    useState<SelectedCreateRange | null>(null)
   const visibleRange = useMemo(() => getCalendarRange(date, view), [date, view])
   const calendar = useSelectedCalendar(scheduleId, visibleRange)
-  const { moveEvent, pendingEventIds } = calendar
+  const {
+    isEventTimePending,
+    moveEvent,
+    resizeEvent,
+    pendingEventIds,
+  } = calendar
+  const resizeDirectionRef = useRef<DragDirection | null>(null)
   const dialog = useEventDialog()
+  const openCreateDialog = dialog.open
+  const closeCreateDialogState = dialog.close
   const details = useEventDetails(scheduleId)
+  const openEventDetails = details.open
+
+  const openDefaultCreateDialog = useCallback(() => {
+    setSelectedCreateRange(null)
+    openCreateDialog()
+  }, [openCreateDialog])
+
+  const closeCreateDialog = useCallback(() => {
+    setSelectedCreateRange(null)
+    closeCreateDialogState()
+  }, [closeCreateDialogState])
 
   const handleNavigate = useCallback(
     (nextDate: Date) => {
@@ -59,6 +92,71 @@ export function SelectedScheduleCalendar({
       moveEvent(event, start, end)
     },
     [moveEvent],
+  )
+
+  const handleDragStart = useCallback(
+    ({ action, direction }: OnDragStartArgs<CalendarEvent>) => {
+      resizeDirectionRef.current = action === 'resize' ? direction : null
+    },
+    [],
+  )
+
+  const handleEventResize = useCallback(
+    ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+      const direction = resizeDirectionRef.current
+      resizeDirectionRef.current = null
+      resizeEvent(event, start, end, direction)
+    },
+    [resizeEvent],
+  )
+
+  const handleSelectEvent = useCallback(
+    (event: CalendarEvent) => {
+      if (isEventTimePending(event.id)) {
+        toast.info('Дождитесь завершения изменения времени события.')
+        return
+      }
+
+      openEventDetails(event)
+    },
+    [isEventTimePending, openEventDetails],
+  )
+
+  const handleSelectSlot = useCallback(
+    ({ action, start, end }: SlotInfo) => {
+      if (
+        (view !== 'week' && view !== 'day') ||
+        action !== 'select' ||
+        !(start instanceof Date) ||
+        !(end instanceof Date) ||
+        Number.isNaN(start.getTime()) ||
+        Number.isNaN(end.getTime())
+      ) {
+        return
+      }
+
+      const rangeStart = start.getTime() <= end.getTime() ? start : end
+      const rangeEnd = start.getTime() <= end.getTime() ? end : start
+      const minimumDurationMs = CALENDAR_TIME_STEP_MINUTES * 60 * 1000
+      const isSameLocalDay =
+        rangeStart.getFullYear() === rangeEnd.getFullYear() &&
+        rangeStart.getMonth() === rangeEnd.getMonth() &&
+        rangeStart.getDate() === rangeEnd.getDate()
+
+      if (
+        !isSameLocalDay ||
+        rangeEnd.getTime() - rangeStart.getTime() < minimumDurationMs
+      ) {
+        return
+      }
+
+      setSelectedCreateRange({
+        start: new Date(rangeStart.getTime()),
+        end: new Date(rangeEnd.getTime()),
+      })
+      openCreateDialog()
+    },
+    [openCreateDialog, view],
   )
 
   if (calendar.isLoading) {
@@ -101,7 +199,7 @@ export function SelectedScheduleCalendar({
             />
             Обновить
           </Button>
-          <Button onClick={dialog.open}>
+          <Button onClick={openDefaultCreateDialog}>
           <Plus />
           Создать событие
           </Button>
@@ -120,17 +218,22 @@ export function SelectedScheduleCalendar({
           events={calendar.events}
           onNavigate={handleNavigate}
           onView={handleViewChange}
-          onSelectEvent={details.open}
+          onSelectEvent={handleSelectEvent}
+          onSelectSlot={handleSelectSlot}
           onEventDrop={handleEventDrop}
-          isEventDraggable={(event) => !pendingEventIds.has(event.id)}
+          onEventResize={handleEventResize}
+          onDragStart={handleDragStart}
+          isEventTimeMutable={(event) => !pendingEventIds.has(event.id)}
         />
       </div>
 
       {dialog.isOpen && (
         <CreateEventDialog
           isPending={calendar.isCreating}
+          initialStart={selectedCreateRange?.start}
+          initialEnd={selectedCreateRange?.end}
           onCreate={calendar.createEvent}
-          onClose={dialog.close}
+          onClose={closeCreateDialog}
         />
       )}
 
@@ -138,6 +241,24 @@ export function SelectedScheduleCalendar({
         <EventDetailsDialog
           event={details.event}
           isLoading={details.isLoading}
+          isUpdating={
+            details.event
+              ? calendar.updatingEventIds.has(details.event.id)
+              : false
+          }
+          isDeleting={
+            details.event
+              ? calendar.deletingEventIds.has(details.event.id)
+              : false
+          }
+          isTimeMutationPending={
+            details.event
+              ? pendingEventIds.has(details.event.id)
+              : false
+          }
+          onUpdate={calendar.updateEvent}
+          onEventUpdated={details.replace}
+          onDelete={calendar.deleteEvent}
           onClose={details.close}
         />
       )}

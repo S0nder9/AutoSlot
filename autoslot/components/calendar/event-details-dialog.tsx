@@ -1,35 +1,149 @@
 'use client'
 
-import { CalendarClock, CircleDollarSign, Loader2, Wrench } from 'lucide-react'
+import { useState } from 'react'
+import {
+  CalendarClock,
+  CircleDollarSign,
+  Loader2,
+  Trash2,
+  Wrench,
+} from 'lucide-react'
+import { EventForm } from '@/components/calendar/event-form'
 import { Button } from '@/components/ui/button'
 import { ScheduleDialogShell } from '@/components/dashboard/schedule-dialog-shell'
-import type { ScheduleEvent } from '@/lib/calendar-types'
+import { getEventFormInitialValues } from '@/hooks/use-event-form'
+import type {
+  EventFormPayload,
+  ScheduleEvent,
+  UpdateEventPayload,
+} from '@/lib/calendar-types'
 import { formatEventDate, formatEventPrice } from '@/lib/format-event'
 
 type EventDetailsDialogProps = {
   event: ScheduleEvent | null
   isLoading: boolean
+  isUpdating: boolean
+  isDeleting: boolean
+  isTimeMutationPending: boolean
+  onUpdate: (
+    eventId: string,
+    payload: UpdateEventPayload,
+  ) => Promise<ScheduleEvent | null>
+  onEventUpdated: (event: ScheduleEvent) => void
+  onDelete: (eventId: string) => Promise<boolean>
   onClose: () => void
 }
 
 export function EventDetailsDialog({
   event,
   isLoading,
+  isUpdating,
+  isDeleting,
+  isTimeMutationPending,
+  onUpdate,
+  onEventUpdated,
+  onDelete,
   onClose,
 }: EventDetailsDialogProps) {
+  const [mode, setMode] = useState<'details' | 'edit' | 'delete'>('details')
+
+  const handleUpdate = async (payload: EventFormPayload) => {
+    if (!event) {
+      return false
+    }
+
+    const updatedEvent = await onUpdate(event.id, {
+      ...payload,
+      jobs: event.jobs.map(({ jobId, employeeId, clientPrice }) => ({
+        jobId,
+        employeeId,
+        clientPrice,
+      })),
+    })
+
+    if (!updatedEvent) {
+      return false
+    }
+
+    onEventUpdated(updatedEvent)
+    return true
+  }
+
+  const handleDelete = async () => {
+    if (!event || isTimeMutationPending) {
+      return
+    }
+
+    if (await onDelete(event.id)) {
+      onClose()
+    }
+  }
+
+  const handleDialogClose = () => {
+    if (mode === 'delete') {
+      setMode('details')
+      return
+    }
+
+    onClose()
+  }
+
+  const eventTitle = event?.title.trim()
+
   return (
     <ScheduleDialogShell
-      title={event?.title ?? 'Загрузка события'}
-      description="Подробная информация о записи в календаре."
+      title={
+        mode === 'delete'
+          ? eventTitle
+            ? `Удалить событие «${eventTitle}»?`
+            : 'Удалить это событие?'
+          : event?.title ?? 'Загрузка события'
+      }
+      description={
+        mode === 'delete'
+          ? 'Событие будет удалено. Это действие нельзя отменить.'
+          : mode === 'edit'
+          ? 'Измените данные записи и сохраните результат.'
+          : 'Подробная информация о записи в календаре.'
+      }
       titleId="event-details-title"
       descriptionId="event-details-description"
-      disabled={false}
-      onClose={onClose}
+      disabled={isUpdating || isDeleting}
+      alert={mode === 'delete'}
+      narrow={mode === 'delete'}
+      onClose={handleDialogClose}
     >
       {isLoading ? (
         <div className="flex min-h-52 items-center justify-center">
           <Loader2 className="size-7 animate-spin text-muted-foreground" />
         </div>
+      ) : event && mode === 'delete' ? (
+        <div className="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            disabled={isDeleting}
+            onClick={() => setMode('details')}
+          >
+            Отмена
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={isDeleting || isTimeMutationPending}
+            onClick={() => void handleDelete()}
+          >
+            {isDeleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            {isDeleting ? 'Удаление...' : 'Удалить'}
+          </Button>
+        </div>
+      ) : event && mode === 'edit' ? (
+        <EventForm
+          initialValues={getEventFormInitialValues(event)}
+          isPending={isUpdating}
+          submitLabel="Сохранить"
+          onSubmit={handleUpdate}
+          onSuccess={() => setMode('details')}
+          onCancel={() => setMode('details')}
+        />
       ) : event ? (
         <div className="space-y-5">
           <div className="flex items-start gap-3 rounded-lg bg-muted/60 p-4">
@@ -98,8 +212,22 @@ export function EventDetailsDialog({
             )}
           </div>
 
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              variant="destructive"
+              disabled={isTimeMutationPending || isUpdating || isDeleting}
+              onClick={() => setMode('delete')}
+            >
+              <Trash2 />
+              Удалить
+            </Button>
+            <Button
+              disabled={isTimeMutationPending || isDeleting}
+              onClick={() => setMode('edit')}
+            >
+              Редактировать
+            </Button>
+            <Button variant="outline" onClick={handleDialogClose}>
               Закрыть
             </Button>
           </div>

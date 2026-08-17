@@ -1,4 +1,4 @@
-import { isValid, parse } from 'date-fns'
+import { format, isValid, parse } from 'date-fns'
 
 const DATE_TIME_LOCAL_FORMAT = "yyyy-MM-dd'T'HH:mm"
 
@@ -10,6 +10,11 @@ export type EventApiTimeRange = {
 export function parseLocalDateTime(value: string): Date | null {
   const date = parse(value, DATE_TIME_LOCAL_FORMAT, new Date())
   return isValid(date) ? date : null
+}
+
+export function formatLocalDateTime(value: string | Date): string | null {
+  const date = value instanceof Date ? value : new Date(value)
+  return isValid(date) ? format(date, DATE_TIME_LOCAL_FORMAT) : null
 }
 
 export function serializeEventTimeRange(
@@ -61,4 +66,57 @@ export function getDraggedEventTimeRange(
   }
 
   return { start: nextStart, end: nextEnd }
+}
+
+export function getResizedEventTimeRange(
+  oldStart: Date,
+  oldEnd: Date,
+  resizeStart: string | Date,
+  resizeEnd: string | Date,
+  minimumDurationMinutes: number,
+  direction: 'UP' | 'DOWN',
+): { start: Date; end: Date } | null {
+  const callbackStart = resizeStart instanceof Date
+    ? new Date(resizeStart.getTime())
+    : new Date(resizeStart)
+  const callbackEnd = resizeEnd instanceof Date
+    ? new Date(resizeEnd.getTime())
+    : new Date(resizeEnd)
+  const minimumDurationMs = minimumDurationMinutes * 60 * 1000
+
+  if (
+    !isValid(oldStart) ||
+    !isValid(oldEnd) ||
+    !isValid(callbackStart) ||
+    !isValid(callbackEnd) ||
+    oldEnd.getTime() <= oldStart.getTime()
+  ) {
+    return null
+  }
+
+  if (direction === 'DOWN') {
+    if (
+      callbackStart.getTime() !== oldStart.getTime() ||
+      callbackEnd.getTime() - oldStart.getTime() < minimumDurationMs
+    ) {
+      return null
+    }
+
+    return {
+      start: new Date(oldStart.getTime()),
+      end: callbackEnd,
+    }
+  }
+
+  if (
+    callbackEnd.getTime() !== oldEnd.getTime() ||
+    oldEnd.getTime() - callbackStart.getTime() < minimumDurationMs
+  ) {
+    return null
+  }
+
+  return {
+    start: callbackStart,
+    end: new Date(oldEnd.getTime()),
+  }
 }

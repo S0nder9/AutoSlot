@@ -2,12 +2,16 @@
 
 import { CircleCheck } from 'lucide-react'
 import { Calendar, Views } from 'react-big-calendar'
-import type { EventProps, View } from 'react-big-calendar'
+import type { EventProps, SlotInfo, View } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
-import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop'
+import type {
+  EventInteractionArgs,
+  OnDragStartArgs,
+} from 'react-big-calendar/lib/addons/dragAndDrop'
 import type { CalendarEvent } from '@/lib/calendar-types'
 import {
   CALENDAR_AGENDA_LENGTH,
+  CALENDAR_TIME_STEP_MINUTES,
   type CalendarView,
 } from '@/lib/calendar-navigation'
 import {
@@ -25,8 +29,11 @@ type EventsCalendarProps = {
   onNavigate: (date: Date) => void
   onView: (view: CalendarView) => void
   onSelectEvent: (event: CalendarEvent) => void
+  onSelectSlot: (slotInfo: SlotInfo) => void
   onEventDrop: (args: EventInteractionArgs<CalendarEvent>) => void
-  isEventDraggable: (event: CalendarEvent) => boolean
+  onEventResize: (args: EventInteractionArgs<CalendarEvent>) => void
+  onDragStart: (args: OnDragStartArgs<CalendarEvent>) => void
+  isEventTimeMutable: (event: CalendarEvent) => boolean
 }
 
 function CalendarEventContent({ event }: EventProps<CalendarEvent>) {
@@ -50,8 +57,11 @@ export function EventsCalendar({
   onNavigate,
   onView,
   onSelectEvent,
+  onSelectSlot,
   onEventDrop,
-  isEventDraggable,
+  onEventResize,
+  onDragStart,
+  isEventTimeMutable,
 }: EventsCalendarProps) {
   const minTime = new Date();
   minTime.setHours(9, 0, 0);
@@ -66,7 +76,7 @@ export function EventsCalendar({
       endAccessor="end"
       min={minTime}
       max={maxTime}
-      step ={15}
+      step={CALENDAR_TIME_STEP_MINUTES}
       length={CALENDAR_AGENDA_LENGTH}
       date={date}
       view={view}
@@ -76,11 +86,23 @@ export function EventsCalendar({
       onNavigate={onNavigate}
       onView={(nextView: View) => onView(nextView as CalendarView)}
       onSelectEvent={onSelectEvent}
+      onSelectSlot={onSelectSlot}
       onEventDrop={onEventDrop}
+      onEventResize={onEventResize}
+      onDragStart={onDragStart}
       draggableAccessor={(event) =>
-        view !== Views.AGENDA && isEventDraggable(event)
+        view !== Views.AGENDA && isEventTimeMutable(event)
       }
-      resizable={false}
+      resizable
+      resizableAccessor={(event) =>
+        (view === Views.WEEK || view === Views.DAY) &&
+        isEventTimeMutable(event)
+      }
+      selectable={
+        view === Views.WEEK || view === Views.DAY
+          ? 'ignoreEvents'
+          : false
+      }
       eventPropGetter={calendarEventStyle}
       popup
       className="min-h-[1000px]"
