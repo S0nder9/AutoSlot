@@ -3,9 +3,10 @@
 import { EventForm } from '@/components/calendar/event-form'
 import { ScheduleDialogShell } from '@/components/dashboard/schedule-dialog-shell'
 import { getCreateEventFormInitialValues } from '@/hooks/use-event-form'
-import type { CreateEventPayload, EventFormPayload } from '@/lib/calendar-types'
+import type { CreateEventPayload } from '@/lib/calendar-types'
 
 type CreateEventDialogProps = {
+  scheduleId: string
   isPending: boolean
   initialStart?: Date
   initialEnd?: Date
@@ -14,15 +15,13 @@ type CreateEventDialogProps = {
 }
 
 export function CreateEventDialog({
+  scheduleId,
   isPending,
   initialStart,
   initialEnd,
   onCreate,
   onClose,
 }: CreateEventDialogProps) {
-  const handleCreate = (payload: EventFormPayload) =>
-    onCreate({ ...payload, jobs: [] })
-
   return (
     <ScheduleDialogShell
       title="Новое событие"
@@ -33,10 +32,11 @@ export function CreateEventDialog({
       onClose={onClose}
     >
       <EventForm
+        scheduleId={scheduleId}
         initialValues={getCreateEventFormInitialValues(initialStart, initialEnd)}
         isPending={isPending}
         submitLabel="Создать"
-        onSubmit={handleCreate}
+        onSubmit={onCreate}
         onSuccess={onClose}
         onCancel={onClose}
       />

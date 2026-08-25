@@ -11,6 +11,8 @@ import type { CalendarRange } from '@/lib/calendar-types'
 
 export const CALENDAR_AGENDA_LENGTH = 30
 export const CALENDAR_TIME_STEP_MINUTES = 15
+export const CALENDAR_DAY_START_HOUR = 9
+export const CALENDAR_DAY_END_HOUR = 19
 
 export const calendarViews = [
   'month',

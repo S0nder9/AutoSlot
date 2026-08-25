@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { EventFormPayload, ScheduleEvent } from '@/lib/calendar-types'
+import type { EventFieldsPayload, ScheduleEvent } from '@/lib/calendar-types'
 import {
   formatLocalDateTime,
   parseLocalDateTime,
@@ -57,7 +57,7 @@ export function getEventFormInitialValues(event: ScheduleEvent): EventFormValues
 }
 
 export function useEventForm(
-  onSubmit: (payload: EventFormPayload) => Promise<boolean>,
+  onSubmit: (payload: EventFieldsPayload) => Promise<boolean>,
   onSuccess: () => void,
   initialValues?: EventFormValues,
 ) {
@@ -111,7 +111,7 @@ export function useEventForm(
         return
       }
 
-      const payload: EventFormPayload = {
+      const payload: EventFieldsPayload = {
         title: result.data.title,
         description: result.data.description,
         color: result.data.color,

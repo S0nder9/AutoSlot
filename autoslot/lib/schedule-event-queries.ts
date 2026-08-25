@@ -15,6 +15,8 @@ export const scheduleEventKeys = {
       range.start.toISOString(),
       range.end.toISOString(),
     ] as const,
+  search: (scheduleId: string, text: string, limit: number) =>
+    [...scheduleEventKeys.schedule(scheduleId), 'search', text, limit] as const,
 }
 
 export function getScheduleEventRangeFromKey(

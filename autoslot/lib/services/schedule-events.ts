@@ -4,6 +4,7 @@ import type {
   CalendarEventSummary,
   CalendarRange,
   CreateEventPayload,
+  EventSearchResult,
   ScheduleEvent,
   SelectedSchedule,
   UpdateEventPayload,
@@ -30,6 +31,20 @@ export async function getScheduleEvents(
     },
   )
   return response.data.data ?? []
+}
+
+export async function searchScheduleEvents(
+  scheduleId: string,
+  text: string,
+  limit: number,
+  offset: number,
+) {
+  const response = await api.get<ApiResponse<EventSearchResult>>(
+    `schedules/${scheduleId}/events/search`,
+    { params: { text, limit, offset } },
+  )
+  if (!response.data.data) throw new Error('Invalid event search response')
+  return response.data.data
 }
 
 export async function getScheduleEvent(scheduleId: string, eventId: string) {

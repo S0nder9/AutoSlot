@@ -2,14 +2,21 @@ import type { Schedule } from '@/lib/schedule-types'
 
 export type ScheduleEvent = {
   id: string
+  clientId: string | null
+  clientName: string | null
+  carId: string | null
+  carName: string | null
   title: string
   description: string | null
   color: string
   startTime: string
   endTime: string
+  workTotal: number
+  partsTotal: number
   totalCost: number
   isPaid: boolean
   jobs: ScheduleEventJob[]
+  parts: ScheduleEventPart[]
   createdAt: string
   updatedAt: string
 }
@@ -23,12 +30,29 @@ export type CalendarEventSummary = {
   endTime: string
 }
 
+export type EventSearchResult = {
+  items: CalendarEventSummary[]
+  hasMore: boolean
+  nextOffset: number | null
+}
+
 export type ScheduleEventJob = {
+  id: string
   jobId: string
   employeeId: string
   clientPrice: number
-  jobName?: string | null
-  employeeName?: string | null
+  jobName: string
+  employeeName: string
+}
+
+export type ScheduleEventPart = {
+  id: string
+  partId: string
+  partName: string
+  purchasePrice: number
+  quantity: number
+  unitPrice: number
+  lineTotal: number
 }
 
 export type CalendarEvent = {
@@ -46,26 +70,40 @@ export type CalendarRange = {
   end: Date
 }
 
-export type CreateEventPayload = {
+export type EventFieldsPayload = {
   title: string
   description: string
   color: string
   startTime: Date
   endTime: Date
   isPaid: boolean
-  jobs: []
 }
-
-export type EventFormPayload = Omit<CreateEventPayload, 'jobs'>
 
 export type UpdateEventJobPayload = {
   jobId: string
-  employeeId: string
+  employeeId?: string
   clientPrice: number
 }
 
-export type UpdateEventPayload = EventFormPayload & {
-  jobs: UpdateEventJobPayload[]
+export type UpdateEventPartPayload = {
+  partId: string
+  quantity: number
+  unitPrice: number
 }
+
+export type EventPartFormItem = UpdateEventPartPayload & {
+  partName: string
+  purchasePrice: number
+}
+
+export type EventFormPayload = EventFieldsPayload & {
+  clientId: string | null
+  carId: string | null
+  jobs: UpdateEventJobPayload[]
+  parts: UpdateEventPartPayload[]
+}
+
+export type CreateEventPayload = EventFormPayload
+export type UpdateEventPayload = EventFormPayload
 
 export type SelectedSchedule = Schedule

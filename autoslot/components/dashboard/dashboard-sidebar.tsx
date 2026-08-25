@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight, ShieldCheck, UserRound, X } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { dashboardNavigation } from '@/lib/dashboard-navigation'
@@ -17,6 +17,7 @@ export function DashboardSidebar({
   onNavigate,
 }: DashboardSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   return (
     <aside
@@ -55,7 +56,21 @@ export function DashboardSidebar({
             <Link
               key={item.href}
               href={item.href}
-              onClick={onNavigate}
+              onClick={(event) => {
+                onNavigate?.()
+                if (
+                  item.href !== '/dashboard/jobs' &&
+                  item.href !== '/dashboard/employees' &&
+                  item.href !== '/dashboard/clients' &&
+                  item.href !== '/dashboard/cars' &&
+                  item.href !== '/dashboard/parts' &&
+                  item.href !== '/dashboard/schedule'
+                ) return
+                const scheduleId = new URLSearchParams(window.location.search).get('scheduleId')
+                if (!scheduleId) return
+                event.preventDefault()
+                router.push(`${item.href}?scheduleId=${encodeURIComponent(scheduleId)}`)
+              }}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'group flex h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors',

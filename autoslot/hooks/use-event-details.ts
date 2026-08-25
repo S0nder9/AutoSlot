@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { CalendarEvent, ScheduleEvent } from '@/lib/calendar-types'
+import type { ScheduleEvent } from '@/lib/calendar-types'
 import { getRequestError } from '@/lib/request-error'
 import { getScheduleEvent } from '@/lib/services/schedule-events'
 
@@ -13,7 +13,7 @@ export function useEventDetails(scheduleId: string) {
   const requestIdRef = useRef(0)
 
   const open = useCallback(
-    async (calendarEvent: CalendarEvent) => {
+    async (calendarEvent: { id: string }) => {
       const requestId = ++requestIdRef.current
       setIsOpen(true)
       setIsLoading(true)

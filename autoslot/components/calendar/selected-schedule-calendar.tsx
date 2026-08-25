@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import type {
   DragDirection,
@@ -14,10 +14,13 @@ import { CreateEventDialog } from '@/components/calendar/create-event-dialog'
 import { EventDetailsDialog } from '@/components/calendar/event-details-dialog'
 import { EventsCalendar } from '@/components/calendar/events-calendar'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useEventDialog } from '@/hooks/use-event-dialog'
 import { useEventDetails } from '@/hooks/use-event-details'
 import { useSelectedCalendar } from '@/hooks/use-selected-calendar'
+import { useScheduleEventSearch } from '@/hooks/use-schedule-event-search'
 import {
+  CALENDAR_DAY_START_HOUR,
   CALENDAR_TIME_STEP_MINUTES,
   getCalendarRange,
   type CalendarView,
@@ -36,6 +39,16 @@ type SelectedCreateRange = {
   end: Date
 }
 
+const eventSearchDateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+})
+
+function formatEventSearchDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Дата не указана' : eventSearchDateFormatter.format(date)
+}
+
 export function SelectedScheduleCalendar({
   scheduleId,
   initialDate,
@@ -44,6 +57,8 @@ export function SelectedScheduleCalendar({
 }: SelectedScheduleCalendarProps) {
   const [date, setDate] = useState(initialDate)
   const [view, setView] = useState(initialView)
+  const [eventSearchText, setEventSearchText] = useState('')
+  const eventSearch = useScheduleEventSearch(scheduleId, eventSearchText)
   const [selectedCreateRange, setSelectedCreateRange] =
     useState<SelectedCreateRange | null>(null)
   const visibleRange = useMemo(() => getCalendarRange(date, view), [date, view])
@@ -60,6 +75,11 @@ export function SelectedScheduleCalendar({
   const closeCreateDialogState = dialog.close
   const details = useEventDetails(scheduleId)
   const openEventDetails = details.open
+
+  const handleSearchEventSelect = useCallback((eventId: string) => {
+    setEventSearchText('')
+    void openEventDetails({ id: eventId })
+  }, [openEventDetails])
 
   const openDefaultCreateDialog = useCallback(() => {
     setSelectedCreateRange(null)
@@ -124,13 +144,29 @@ export function SelectedScheduleCalendar({
 
   const handleSelectSlot = useCallback(
     ({ action, start, end }: SlotInfo) => {
+      const hasValidDates =
+        start instanceof Date &&
+        end instanceof Date &&
+        !Number.isNaN(start.getTime()) &&
+        !Number.isNaN(end.getTime())
+
+      if (view === 'month') {
+        if (action !== 'click' || !hasValidDates) return
+
+        const rangeStart = new Date(start)
+        rangeStart.setHours(CALENDAR_DAY_START_HOUR, 0, 0, 0)
+        const rangeEnd = new Date(rangeStart)
+        rangeEnd.setHours(rangeStart.getHours() + 1)
+
+        setSelectedCreateRange({ start: rangeStart, end: rangeEnd })
+        openCreateDialog()
+        return
+      }
+
       if (
         (view !== 'week' && view !== 'day') ||
         action !== 'select' ||
-        !(start instanceof Date) ||
-        !(end instanceof Date) ||
-        Number.isNaN(start.getTime()) ||
-        Number.isNaN(end.getTime())
+        !hasValidDates
       ) {
         return
       }
@@ -188,7 +224,43 @@ export function SelectedScheduleCalendar({
             <p className="text-sm text-muted-foreground">Планирование записей автосервиса</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Поиск событий..."
+              value={eventSearchText}
+              onChange={(event) => setEventSearchText(event.target.value)}
+              aria-label="Поиск событий"
+            />
+            {eventSearchText.trim() && (
+              <div className="absolute top-full right-0 z-30 mt-2 w-full min-w-72 overflow-hidden rounded-lg border bg-background shadow-xl">
+                {eventSearch.isSearching ? (
+                  <div className="flex justify-center py-6"><Loader2 className="size-5 animate-spin" /></div>
+                ) : eventSearch.error ? (
+                  <p className="px-3 py-4 text-sm text-destructive">Не удалось выполнить поиск событий.</p>
+                ) : eventSearch.events.length ? (
+                  <div className="max-h-72 overflow-y-auto p-1">
+                    {eventSearch.events.map((event) => (
+                      <button key={event.id} type="button" className="block w-full rounded-md px-3 py-2 text-left hover:bg-muted" onClick={() => handleSearchEventSelect(event.id)}>
+                        <span className="block truncate text-sm font-medium">{event.title}</span>
+                        <span className="block text-xs text-muted-foreground">{formatEventSearchDate(event.startTime)}</span>
+                      </button>
+                    ))}
+                    {eventSearch.hasMore && (
+                      <Button type="button" className="mt-1 w-full" variant="ghost" disabled={eventSearch.isLoadingMore} onClick={() => void eventSearch.loadMore()}>
+                        {eventSearch.isLoadingMore && <Loader2 className="animate-spin" />}
+                        Показать ещё
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">События не найдены.</p>
+                )}
+              </div>
+            )}
+          </div>
           <Button
             variant="outline"
             disabled={calendar.isEventsFetching}
@@ -229,6 +301,7 @@ export function SelectedScheduleCalendar({
 
       {dialog.isOpen && (
         <CreateEventDialog
+          scheduleId={scheduleId}
           isPending={calendar.isCreating}
           initialStart={selectedCreateRange?.start}
           initialEnd={selectedCreateRange?.end}
@@ -239,6 +312,7 @@ export function SelectedScheduleCalendar({
 
       {details.isOpen && (
         <EventDetailsDialog
+          scheduleId={scheduleId}
           event={details.event}
           isLoading={details.isLoading}
           isUpdating={

@@ -11,6 +11,8 @@ import type {
 import type { CalendarEvent } from '@/lib/calendar-types'
 import {
   CALENDAR_AGENDA_LENGTH,
+  CALENDAR_DAY_END_HOUR,
+  CALENDAR_DAY_START_HOUR,
   CALENDAR_TIME_STEP_MINUTES,
   type CalendarView,
 } from '@/lib/calendar-navigation'
@@ -64,9 +66,9 @@ export function EventsCalendar({
   isEventTimeMutable,
 }: EventsCalendarProps) {
   const minTime = new Date();
-  minTime.setHours(9, 0, 0);
+  minTime.setHours(CALENDAR_DAY_START_HOUR, 0, 0);
   const maxTime = new Date();
-  maxTime.setHours(19, 0, 0);
+  maxTime.setHours(CALENDAR_DAY_END_HOUR, 0, 0);
   return (
     <DragAndDropCalendar
       localizer={calendarLocalizer}
@@ -99,7 +101,7 @@ export function EventsCalendar({
         isEventTimeMutable(event)
       }
       selectable={
-        view === Views.WEEK || view === Views.DAY
+        view === Views.MONTH || view === Views.WEEK || view === Views.DAY
           ? 'ignoreEvents'
           : false
       }
