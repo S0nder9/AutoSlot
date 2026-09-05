@@ -25,7 +25,7 @@ export function CreateEventDialog({
   return (
     <ScheduleDialogShell
       title="Новое событие"
-      description="Заполните основные данные записи. Работы и сотрудники будут добавлены на следующем этапе."
+      description="Укажите время записи, клиента, работы и запчасти."
       titleId="create-event-title"
       descriptionId="create-event-description"
       disabled={isPending}

@@ -35,9 +35,9 @@ export function DashboardHeader({
           </p>
           </div>
         </div>
-        <Button variant="outline" disabled={isLoggingOut} onClick={onLogout}>
+        <Button variant="outline" aria-label="Выйти" disabled={isLoggingOut} onClick={onLogout}>
           {isLoggingOut ? <Loader2 className="animate-spin" /> : <LogOut />}
-          Выйти
+          <span className="hidden sm:inline">Выйти</span>
         </Button>
       </div>
     </header>

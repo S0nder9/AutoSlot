@@ -11,8 +11,11 @@ import {
   useState,
 } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { isCancel } from 'axios'
 import {
   api,
+  getApiSessionVersion,
+  invalidateApiSession,
   refreshAccessToken,
   setRefreshSuccessHandler,
   setUnauthorizedHandler,
@@ -75,6 +78,7 @@ export function AuthProvider({
 
   const clearLocalSession = useCallback(() => {
     clearRefreshTimer()
+    invalidateApiSession()
     queryClient.clear()
     setUser(null)
   }, [clearRefreshTimer, queryClient])
@@ -84,21 +88,23 @@ export function AuthProvider({
   }, [])
 
   const refreshUser = useCallback(async () => {
+    const version = getApiSessionVersion()
     try {
       const response =
         await api.get<ApiResponse<User>>('auth/me')
 
       const currentUser = response.data.data
+      if (version !== getApiSessionVersion()) return
 
       if (currentUser) {
         markAccessTokenAsFresh()
       }
 
       setUser(currentUser)
-    } catch {
-      setUser(null)
+    } catch (error) {
+      if (!isCancel(error) && version === getApiSessionVersion()) clearLocalSession()
     }
-  }, [markAccessTokenAsFresh])
+  }, [clearLocalSession, markAccessTokenAsFresh])
 
   /*
    * Регистрируем обработчики для общего API-слоя.
@@ -126,9 +132,11 @@ export function AuthProvider({
    * Единственная первоначальная проверка сессии.
    */
   useEffect(() => {
+    const version = getApiSessionVersion()
     void api
       .get<ApiResponse<User>>('auth/me')
       .then((response) => {
+        if (version !== getApiSessionVersion()) return
         const currentUser = response.data.data
 
         if (currentUser) {
@@ -137,13 +145,13 @@ export function AuthProvider({
 
         setUser(currentUser)
       })
-      .catch(() => {
-        setUser(null)
+      .catch((error) => {
+        if (!isCancel(error) && version === getApiSessionVersion()) clearLocalSession()
       })
       .finally(() => {
         setIsLoading(false)
       })
-  }, [markAccessTokenAsFresh])
+  }, [clearLocalSession, markAccessTokenAsFresh])
 
   /*
    * Фоновое обновление access token.
@@ -236,6 +244,8 @@ export function AuthProvider({
         password,
       }
 
+      clearLocalSession()
+
       const response =
         await api.post<ApiResponse<User>>(
           'auth/login',
@@ -253,7 +263,7 @@ export function AuthProvider({
       markAccessTokenAsFresh()
       setUser(currentUser)
     },
-    [markAccessTokenAsFresh],
+    [clearLocalSession, markAccessTokenAsFresh],
   )
 
   const register = useCallback(

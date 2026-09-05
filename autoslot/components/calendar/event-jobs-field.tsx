@@ -6,6 +6,7 @@ import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog'
 import { JobFormDialog } from '@/components/jobs/job-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { useScheduleEmployees } from '@/hooks/use-schedule-employees'
 import { useScheduleEmployeeSearch } from '@/hooks/use-schedule-employee-search'
@@ -13,7 +14,7 @@ import { useScheduleJobs } from '@/hooks/use-schedule-jobs'
 import { useScheduleJobSearch } from '@/hooks/use-schedule-job-search'
 import type {
   ScheduleEventJob,
-  UpdateEventJobPayload,
+  EventJobFormItem,
 } from '@/lib/calendar-types'
 import { formatEmployeeName } from '@/lib/employee-types'
 import type { Employee } from '@/lib/employee-types'
@@ -22,10 +23,10 @@ import type { Job } from '@/lib/job-types'
 
 type EventJobsFieldProps = {
   scheduleId: string
-  value: UpdateEventJobPayload[]
+  value: EventJobFormItem[]
   initialJobs?: ScheduleEventJob[]
   error?: string
-  onChange: (jobs: UpdateEventJobPayload[]) => void
+  onChange: (jobs: EventJobFormItem[]) => void
 }
 
 export function EventJobsField({
@@ -54,7 +55,7 @@ export function EventJobsField({
     : employeesQuery.employees
 
   const initialJobsById = useMemo(
-    () => new Map(initialJobs.map((job) => [job.jobId, job])),
+    () => new Map(initialJobs.map((job) => [job.id, job])),
     [initialJobs],
   )
   const availableJobs = useMemo(() => {
@@ -77,6 +78,7 @@ export function EventJobsField({
     onChange([
       ...value,
       {
+        rowKey: crypto.randomUUID(),
         jobId: job.id,
         employeeId: activeEmployees.length === 1 ? activeEmployees[0].id : undefined,
         clientPrice: job.basePrice,
@@ -86,8 +88,8 @@ export function EventJobsField({
     setIsSelectorOpen(false)
   }
 
-  const updateJob = (jobId: string, patch: Partial<UpdateEventJobPayload>) => {
-    onChange(value.map((item) => (item.jobId === jobId ? { ...item, ...patch } : item)))
+  const updateJob = (jobId: string, patch: Partial<EventJobFormItem>) => {
+    onChange(value.map((item) => (item.rowKey === jobId ? { ...item, ...patch } : item)))
   }
 
   const assignEmployee = (jobId: string, employee?: Employee) => {
@@ -103,7 +105,7 @@ export function EventJobsField({
           <Wrench className="size-4" />
           <Label>Работы</Label>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => setIsSelectorOpen((open) => !open)}>
+        <Button type="button" size="sm" className="h-9 sm:h-7" variant="outline" onClick={() => setIsSelectorOpen((open) => !open)}>
           <Plus /> Добавить работу
         </Button>
       </div>
@@ -114,46 +116,47 @@ export function EventJobsField({
         <div className="space-y-3">
           {value.map((selectedJob) => {
             const catalogJob = jobsQuery.jobs.find(({ id }) => id === selectedJob.jobId)
-            const initialJob = initialJobsById.get(selectedJob.jobId)
+            const initialJob = initialJobsById.get(selectedJob.rowKey)
             const employeeExists = employeesQuery.employees.some(({ id }) => id === selectedJob.employeeId)
             return (
-              <div key={selectedJob.jobId} className="space-y-3 rounded-lg bg-muted/50 p-3">
+              <div key={selectedJob.rowKey} className="space-y-3 rounded-lg bg-muted/50 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">{catalogJob?.name ?? initialJob?.jobName ?? `Работа ${selectedJob.jobId}`}</p>
+                    <p className="text-sm font-medium">{initialJob?.jobName ?? catalogJob?.name ?? `Работа ${selectedJob.jobId}`}</p>
                     {catalogJob && <p className="text-xs text-muted-foreground">Базовая цена: {formatEventPrice(catalogJob.basePrice)}</p>}
                   </div>
-                  <Button type="button" size="icon-sm" variant="ghost" aria-label="Убрать работу" onClick={() => onChange(value.filter(({ jobId }) => jobId !== selectedJob.jobId))}>
+                  <Button type="button" size="icon-sm" className="size-9 sm:size-7" variant="ghost" aria-label="Убрать работу" onClick={() => onChange(value.filter(({ rowKey }) => rowKey !== selectedJob.rowKey))}>
                     <Trash2 />
                   </Button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1 text-xs font-medium">
                     <span>Сотрудник</span>
-                    <Button type="button" className="w-full justify-start" variant="outline" onClick={() => {
-                      setEmployeeSelectorJobId((current) => current === selectedJob.jobId ? null : selectedJob.jobId)
+                    <Button type="button" className="h-10 w-full justify-start sm:h-8" variant="outline" onClick={() => {
+                      setEmployeeSelectorJobId((current) => current === selectedJob.rowKey ? null : selectedJob.rowKey)
                       setEmployeeSearchText('')
                     }}>
-                      {employeesQuery.employees.find(({ id }) => id === selectedJob.employeeId)
+                      {initialJob && initialJob.employeeId === selectedJob.employeeId && initialJob.employeeName
+                        ? initialJob.employeeName
+                        : employeesQuery.employees.find(({ id }) => id === selectedJob.employeeId)
                         ? formatEmployeeName(employeesQuery.employees.find(({ id }) => id === selectedJob.employeeId)!)
                         : selectedJob.employeeId
                           ? initialJob?.employeeName ?? 'Назначенный сотрудник'
-                          : 'Без сотрудника'}
+                          : 'Выберите сотрудника'}
                     </Button>
                   </div>
                   <label className="space-y-1 text-xs font-medium">
                     Цена для события (₽)
-                    <Input type="number" min="0" step="any" value={selectedJob.clientPrice} onChange={(event) => updateJob(selectedJob.jobId, { clientPrice: Math.max(0, Number(event.target.value)) })} />
+                    <MoneyInput value={selectedJob.clientPrice} onValueChange={(clientPrice) => updateJob(selectedJob.rowKey, { clientPrice })} />
                   </label>
                 </div>
-                {employeeSelectorJobId === selectedJob.jobId && (
+                {employeeSelectorJobId === selectedJob.rowKey && (
                   <div className="space-y-2 rounded-lg border bg-background p-3">
                     <span className="relative block">
                       <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input className="pl-8" placeholder="Поиск сотрудника..." value={employeeSearchText} onChange={(event) => setEmployeeSearchText(event.target.value)} autoFocus />
                     </span>
                     <div className="max-h-40 space-y-1 overflow-y-auto">
-                      <button type="button" className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => assignEmployee(selectedJob.jobId)}>Без сотрудника</button>
                       {!employeeExists && selectedJob.employeeId && (
                         <button type="button" className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => {
                           setEmployeeSelectorJobId(null)
@@ -162,12 +165,15 @@ export function EventJobsField({
                       )}
                       {(normalizedEmployeeSearch ? employeeSearch.isSearching : employeesQuery.isLoading) ? (
                         <div className="flex justify-center py-3"><Loader2 className="size-5 animate-spin" /></div>
-                      ) : normalizedEmployeeSearch && employeeSearch.error ? (
-                        <p className="px-2 py-2 text-sm text-destructive">Не удалось выполнить поиск сотрудников.</p>
+                      ) : (normalizedEmployeeSearch ? employeeSearch.error : employeesQuery.error) ? (
+                        <div className="space-y-2 px-2 py-2 text-sm text-destructive">
+                          <p>Не удалось загрузить сотрудников.</p>
+                          <Button type="button" variant="outline" onClick={() => void (normalizedEmployeeSearch ? employeeSearch.refetch() : employeesQuery.refetch())}>Повторить</Button>
+                        </div>
                       ) : selectableEmployees
                         .filter((employee) => employee.isActive)
                         .map((employee) => (
-                          <button key={employee.id} type="button" className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => assignEmployee(selectedJob.jobId, employee)}>{formatEmployeeName(employee)}</button>
+                          <button key={employee.id} type="button" className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => assignEmployee(selectedJob.rowKey, employee)}>{formatEmployeeName(employee)}</button>
                         ))}
                     </div>
                     {normalizedEmployeeSearch && employeeSearch.hasMore && (
@@ -176,7 +182,7 @@ export function EventJobsField({
                         Показать ещё
                       </Button>
                     )}
-                    <Button type="button" className="w-full" variant="outline" onClick={() => setEmployeeCreateJobId(selectedJob.jobId)}><UserPlus /> Добавить сотрудника</Button>
+                    <Button type="button" className="w-full" variant="outline" onClick={() => setEmployeeCreateJobId(selectedJob.rowKey)}><UserPlus /> Добавить сотрудника</Button>
                   </div>
                 )}
               </div>
@@ -195,8 +201,11 @@ export function EventJobsField({
           </span>
           {(search.trim() ? jobSearch.isSearching : jobsQuery.isLoading) ? (
             <div className="flex justify-center py-4"><Loader2 className="size-5 animate-spin" /></div>
-          ) : jobSearch.error && search.trim() ? (
-            <p className="py-2 text-sm text-destructive">Не удалось выполнить поиск работ.</p>
+          ) : (search.trim() ? jobSearch.error : jobsQuery.error) ? (
+            <div className="space-y-2 py-2 text-sm text-destructive">
+              <p>Не удалось загрузить работы.</p>
+              <Button type="button" variant="outline" onClick={() => void (search.trim() ? jobSearch.refetch() : jobsQuery.refetch())}>Повторить</Button>
+            </div>
           ) : availableJobs.length ? (
             <div className="max-h-44 space-y-1 overflow-y-auto">
               {availableJobs.map((job) => <button key={job.id} type="button" className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => addJob(job)}><span>{job.name}</span><span className="text-muted-foreground">{formatEventPrice(job.basePrice)}</span></button>)}

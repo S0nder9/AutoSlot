@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Job, JobPayload } from '@/lib/job-types'
 import { scheduleJobKeys } from '@/lib/job-queries'
+import { reconcileCatalogMutation } from '@/lib/cache-reconciliation'
 import { getRequestError } from '@/lib/request-error'
 import {
   createScheduleJob,
@@ -32,12 +33,8 @@ export function useScheduleJobs(scheduleId: string) {
 
   const createMutation = useMutation({
     mutationFn: (payload: JobPayload) => createScheduleJob(scheduleId, payload),
-    onSuccess: (job) => {
-      queryClient.setQueryData<Job[]>(queryKey, (current = []) =>
-        [...current.filter(({ id }) => id !== job.id), job].sort((a, b) =>
-          a.name.localeCompare(b.name, 'ru'),
-        ),
-      )
+    onSuccess: async (job) => {
+      await reconcileCatalogMutation<Job>(queryClient, queryKey, job, (a, b) => a.name.localeCompare(b.name, 'ru'))
       toast.success('Работа создана')
     },
     onError: (error) => {
@@ -48,13 +45,8 @@ export function useScheduleJobs(scheduleId: string) {
   const updateMutation = useMutation({
     mutationFn: ({ jobId, payload }: { jobId: string; payload: JobPayload }) =>
       updateScheduleJob(scheduleId, jobId, payload),
-    onSuccess: (job) => {
-      queryClient.setQueryData<Job[]>(queryKey, (current = []) =>
-        (current.some(({ id }) => id === job.id)
-          ? current.map((item) => (item.id === job.id ? job : item))
-          : [...current, job])
-          .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
-      )
+    onSuccess: async (job) => {
+      await reconcileCatalogMutation<Job>(queryClient, queryKey, job, (a, b) => a.name.localeCompare(b.name, 'ru'))
       toast.success('Работа обновлена')
     },
     onError: (error) => {
@@ -64,10 +56,8 @@ export function useScheduleJobs(scheduleId: string) {
 
   const deleteMutation = useMutation({
     mutationFn: (jobId: string) => deleteScheduleJob(scheduleId, jobId),
-    onSuccess: (_, jobId) => {
-      queryClient.setQueryData<Job[]>(queryKey, (current = []) =>
-        current.filter((job) => job.id !== jobId),
-      )
+    onSuccess: async (_, jobId) => {
+      await reconcileCatalogMutation<Job>(queryClient, queryKey, jobId, (a, b) => a.name.localeCompare(b.name, 'ru'))
       toast.success('Работа удалена')
     },
     onError: (error) => {
@@ -97,17 +87,16 @@ export function useScheduleJobs(scheduleId: string) {
     [updateMutation],
   )
 
-  const deleteJob = useCallback(
-    async (jobId: string) => {
-      try {
-        await deleteMutation.mutateAsync(jobId)
-        return true
-      } catch {
-        return false
-      }
-    },
-    [deleteMutation],
-  )
+  const deletePending = useRef(false)
+  const deleteJob = useCallback(async (jobId: string) => {
+    if (deletePending.current) return false
+    deletePending.current = true
+    try {
+      await deleteMutation.mutateAsync(jobId)
+      return true
+    } catch { return false }
+    finally { deletePending.current = false }
+  }, [deleteMutation])
 
   return {
     jobs: query.data ?? [],

@@ -1,5 +1,5 @@
-import { DashboardPlaceholder } from '@/components/dashboard/dashboard-placeholder'
+import { WeeklyAnalyticsOverview } from '@/components/analytics/weekly-analytics-overview'
 
 export default function AnalyticsPage() {
-  return <DashboardPlaceholder title="Аналитика" />
+  return <WeeklyAnalyticsOverview />
 }

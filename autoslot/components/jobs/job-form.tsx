@@ -64,9 +64,9 @@ export function JobForm({
           <Input
             id="job-base-price"
             name="basePrice"
-            type="number"
-            min="0"
-            step="any"
+            type="text"
+
+
             inputMode="decimal"
             value={form.values.basePrice}
             onChange={form.handleChange}
@@ -81,9 +81,9 @@ export function JobForm({
           <Input
             id="job-estimated-hours"
             name="estimatedHours"
-            type="number"
-            min="0"
-            step="any"
+            type="text"
+
+
             inputMode="decimal"
             value={form.values.estimatedHours}
             onChange={form.handleChange}

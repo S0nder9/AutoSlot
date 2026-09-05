@@ -21,7 +21,7 @@ export function useScheduleJobSearch(
     queryFn: ({ pageParam }) =>
       searchScheduleJobs(scheduleId, debouncedText, limit, pageParam),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    getNextPageParam: (page, _pages, offset) => page.hasMore && page.nextOffset !== null && page.nextOffset > offset ? page.nextOffset : undefined,
     enabled: Boolean(scheduleId && debouncedText),
     staleTime: 30 * 1000,
     retry: false,
@@ -34,7 +34,7 @@ export function useScheduleJobSearch(
   }, [query.error])
 
   const jobs = useMemo(
-    () => query.data?.pages.flatMap(({ items }) => items) ?? [],
+    () => [...new Map((query.data?.pages.flatMap(({ items }) => items) ?? []).map((item) => [item.id, item])).values()],
     [query.data],
   )
 
@@ -47,6 +47,6 @@ export function useScheduleJobSearch(
     error: query.error,
     hasMore: query.hasNextPage,
     isLoadingMore: query.isFetchingNextPage,
-    loadMore: query.fetchNextPage,
+    refetch: query.refetch, loadMore: () => query.fetchNextPage({ cancelRefetch: false }),
   }
 }

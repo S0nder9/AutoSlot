@@ -1,15 +1,9 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist } from 'next/font/google'
 import './globals.css'
-import { cn } from "@/lib/utils";
 import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { QueryProvider } from '@/components/providers/query-provider'
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
 export const metadata: Metadata = {
   title: 'autoSlot — запись клиентов в автосервис',
@@ -29,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ru" className={cn("bg-background", "font-sans", geist.variable)}>
-      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+    <html lang="ru" className="bg-background font-sans">
+      <body className="antialiased" suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

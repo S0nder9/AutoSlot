@@ -13,13 +13,14 @@ import type {
   EventPartFormItem,
   ScheduleEventJob,
   ScheduleEventPart,
-  UpdateEventJobPayload,
+  EventJobFormItem,
 } from '@/lib/calendar-types'
 import { useEventForm } from '@/hooks/use-event-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatEventPrice } from '@/lib/format-event'
+import { isValidMoney, MAX_MONEY } from '@/lib/validations/money'
 
 type EventFormProps = {
   scheduleId: string
@@ -52,8 +53,9 @@ export function EventForm({
   onSuccess,
   onCancel,
 }: EventFormProps) {
-  const [jobs, setJobs] = useState<UpdateEventJobPayload[]>(() =>
-    initialJobs.map(({ jobId, employeeId, clientPrice }) => ({
+  const [jobs, setJobs] = useState<EventJobFormItem[]>(() =>
+    initialJobs.map(({ id, jobId, employeeId, clientPrice }) => ({
+      rowKey: id,
       jobId,
       employeeId: employeeId || undefined,
       clientPrice,
@@ -80,7 +82,7 @@ export function EventForm({
     setClientName(nextClientName ?? null)
   }
 
-  const handleJobsChange = (nextJobs: UpdateEventJobPayload[]) => {
+  const handleJobsChange = (nextJobs: EventJobFormItem[]) => {
     setJobs(nextJobs)
     setJobsError(undefined)
   }
@@ -91,24 +93,38 @@ export function EventForm({
   }
 
   const handleSubmit = async (payload: EventFieldsPayload) => {
-    if (jobs.some(({ clientPrice }) => !Number.isFinite(clientPrice) || clientPrice < 0)) {
-      setJobsError('Укажите корректную цену для каждой работы.')
+    if (jobs.some(({ employeeId }) => !employeeId)) {
+      setJobsError('Выберите сотрудника для каждой работы.')
       return false
     }
-    if (parts.some(({ quantity, unitPrice }) => !Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice < 0)) {
-      setPartsError('Укажите корректное количество и цену для каждой запчасти.')
+    if (new Set(jobs.map(({ jobId, employeeId }) => `${jobId}:${employeeId}`)).size !== jobs.length) {
+      setJobsError('Одна работа не может повторяться у одного сотрудника.')
+      return false
+    }
+    if (jobs.some(({ clientPrice }) => !isValidMoney(clientPrice))) {
+      setJobsError('Цена работы: от 0 до 99 999 999,99 ₽, не более двух знаков после запятой.')
+      return false
+    }
+    if (parts.some(({ quantity, unitPrice }) => !Number.isInteger(quantity) || quantity < 1 || quantity > 2_147_483_647 || !isValidMoney(unitPrice))) {
+      setPartsError('Количество должно быть целым положительным числом; цена — до 99 999 999,99 ₽ и не более двух знаков после запятой.')
       return false
     }
     if (new Set(parts.map(({ partId }) => partId)).size !== parts.length) {
       setPartsError('Одна запчасть не может быть добавлена дважды.')
       return false
     }
+    const total = jobs.reduce((sum, job) => sum + job.clientPrice, 0) + parts.reduce((sum, part) => sum + part.quantity * part.unitPrice, 0)
+    if (total > MAX_MONEY) {
+      setPartsError('Итоговая стоимость заказа не должна превышать 99 999 999,99 ₽.')
+      return false
+    }
     return onSubmit({
       ...payload,
       clientId,
       carId,
-      jobs: jobs.map(({ employeeId, ...job }) => ({
-        ...job,
+      jobs: jobs.map(({ jobId, clientPrice, employeeId }) => ({
+        jobId,
+        clientPrice,
         ...(employeeId ? { employeeId } : {}),
       })),
       parts: parts.map(({ partId, quantity, unitPrice }) => ({
@@ -124,7 +140,7 @@ export function EventForm({
   const partsTotal = parts.reduce((total, part) => total + part.quantity * part.unitPrice, 0)
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit}>
+    <form className="space-y-3 sm:space-y-4" onSubmit={form.handleSubmit}>
       <div className="space-y-2">
         <Label htmlFor="event-title">Название</Label>
         <Input
@@ -140,8 +156,10 @@ export function EventForm({
         )}
       </div>
 
-      <EventClientField scheduleId={scheduleId} value={clientId} initialName={initialClientName} onChange={handleClientChange} />
-      <EventCarField scheduleId={scheduleId} clientId={clientId} clientName={clientName} value={carId} initialName={initialCarName} onChange={setCarId} />
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+        <EventClientField scheduleId={scheduleId} value={clientId} initialName={initialClientName} onChange={handleClientChange} />
+        <EventCarField scheduleId={scheduleId} clientId={clientId} clientName={clientName} value={carId} initialName={initialCarName} onChange={setCarId} />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="event-description">Описание</Label>
@@ -229,11 +247,11 @@ export function EventForm({
         <div className="flex justify-between gap-4 border-t pt-2 font-semibold"><span>Итого</span><span>{formatEventPrice(workTotal + partsTotal)}</span></div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
+      <div className="sticky -bottom-4 z-20 -mx-4 grid grid-cols-2 gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:justify-end sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-2">
+        <Button type="button" className="h-10 sm:h-8" variant="outline" disabled={isPending} onClick={onCancel}>
           Отмена
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" className="h-10 sm:h-8" disabled={isPending}>
           {isPending && <Loader2 className="animate-spin" />}
           {submitLabel}
         </Button>

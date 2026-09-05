@@ -29,10 +29,12 @@ export function EmployeeForm({ employee, isPending, onSubmit, onSuccess, onCance
         <div className="space-y-2">
           <Label htmlFor="employee-last-name">Фамилия</Label>
           <Input id="employee-last-name" name="lastName" value={form.values.lastName} onChange={form.handleChange} />
+          {form.errors.lastName && <p className="text-sm text-destructive">{form.errors.lastName}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="employee-middle-name">Отчество</Label>
           <Input id="employee-middle-name" name="middleName" value={form.values.middleName} onChange={form.handleChange} />
+          {form.errors.middleName && <p className="text-sm text-destructive">{form.errors.middleName}</p>}
         </div>
       </div>
       <div className="flex justify-end gap-3 pt-2">

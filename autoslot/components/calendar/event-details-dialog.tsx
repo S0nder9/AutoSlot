@@ -37,12 +37,13 @@ type EventDetailsDialogProps = {
   isUpdating: boolean
   isDeleting: boolean
   isTimeMutationPending: boolean
-  onUpdate: (
+  readOnly?: boolean
+  onUpdate?: (
     eventId: string,
     payload: UpdateEventPayload,
   ) => Promise<ScheduleEvent | null>
-  onEventUpdated: (event: ScheduleEvent) => void
-  onDelete: (eventId: string) => Promise<boolean>
+  onEventUpdated?: (event: ScheduleEvent) => void
+  onDelete?: (eventId: string) => Promise<boolean>
   onClose: () => void
 }
 
@@ -53,6 +54,7 @@ export function EventDetailsDialog({
   isUpdating,
   isDeleting,
   isTimeMutationPending,
+  readOnly = false,
   onUpdate,
   onEventUpdated,
   onDelete,
@@ -61,7 +63,7 @@ export function EventDetailsDialog({
   const [mode, setMode] = useState<'details' | 'edit' | 'delete'>('details')
 
   const handleUpdate = async (payload: EventFormPayload) => {
-    if (!event) {
+    if (!event || !onUpdate || !onEventUpdated) {
       return false
     }
 
@@ -76,7 +78,7 @@ export function EventDetailsDialog({
   }
 
   const handleDelete = async () => {
-    if (!event || isTimeMutationPending) {
+    if (!event || !onDelete || isTimeMutationPending) {
       return
     }
 
@@ -127,9 +129,9 @@ export function EventDetailsDialog({
       wide={mode === 'edit'}
       compact={isDetails}
       descriptionHidden={isDetails}
-      headerActions={isDetails && event ? <>
-        <Button size="icon" variant="ghost" aria-label="Редактировать событие" title="Редактировать" disabled={isTimeMutationPending || isDeleting} onClick={() => setMode('edit')}><Pencil /></Button>
-        <Button size="icon" variant="ghost" aria-label="Удалить событие" title="Удалить" disabled={isTimeMutationPending || isUpdating || isDeleting} onClick={() => setMode('delete')}><Trash2 /></Button>
+      headerActions={isDetails && event && !readOnly ? <>
+        <Button size="icon" className="size-10 sm:size-8" variant="ghost" aria-label="Редактировать событие" title="Редактировать" disabled={isTimeMutationPending || isDeleting} onClick={() => setMode('edit')}><Pencil /></Button>
+        <Button size="icon" className="size-10 sm:size-8" variant="ghost" aria-label="Удалить событие" title="Удалить" disabled={isTimeMutationPending || isUpdating || isDeleting} onClick={() => setMode('delete')}><Trash2 /></Button>
       </> : undefined}
       onClose={handleDialogClose}
     >
@@ -172,7 +174,13 @@ export function EventDetailsDialog({
           onCancel={() => setMode('details')}
         />
       ) : event ? (
-        <EventDetailsContent event={event} />
+        <>
+          <EventDetailsContent event={event} />
+          {!readOnly && <div className="sticky -bottom-4 z-10 -mx-4 mt-5 grid grid-cols-2 gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:hidden">
+            <Button variant="outline" disabled={isTimeMutationPending || isDeleting} onClick={() => setMode('edit')}><Pencil /> Изменить</Button>
+            <Button variant="destructive" disabled={isTimeMutationPending || isUpdating || isDeleting} onClick={() => setMode('delete')}><Trash2 /> Удалить</Button>
+          </div>}
+        </>
       ) : null}
     </ScheduleDialogShell>
   )

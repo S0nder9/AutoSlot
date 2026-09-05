@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, type FormEvent, useCallback, useRef, useState } from 'react'
 import type { Part, PartPayload } from '@/lib/part-types'
+import { parseDecimalInput } from '@/lib/validations/money'
 import { partFormSchema, type PartFormValues } from '@/lib/validations/part'
 
 type PartFormErrors = Partial<Record<keyof PartFormValues, string>>
@@ -32,8 +33,8 @@ export function usePartForm(
     if (submittingRef.current) return
     const parsed = partFormSchema.safeParse({
       ...values,
-      purchasePrice: values.purchasePrice.trim() ? Number(values.purchasePrice) : Number.NaN,
-      basePrice: values.basePrice.trim() ? Number(values.basePrice) : Number.NaN,
+      purchasePrice: parseDecimalInput(values.purchasePrice),
+      basePrice: parseDecimalInput(values.basePrice),
     })
     if (!parsed.success) {
       const nextErrors: PartFormErrors = {}

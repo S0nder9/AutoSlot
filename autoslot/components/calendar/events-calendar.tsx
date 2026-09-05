@@ -21,6 +21,7 @@ import {
   calendarMessages,
 } from '@/lib/calendar-localizer'
 import { calendarEventStyle } from '@/lib/calendar-event-style'
+import { cn } from '@/lib/utils'
 
 const DragAndDropCalendar = withDragAndDrop<CalendarEvent>(Calendar)
 
@@ -107,7 +108,10 @@ export function EventsCalendar({
       }
       eventPropGetter={calendarEventStyle}
       popup
-      className="min-h-[1000px]"
+      className={cn(
+        'min-h-[720px] sm:min-h-[1000px]',
+        view === Views.WEEK && 'min-w-[760px] sm:min-w-0',
+      )}
     />
   )
 }

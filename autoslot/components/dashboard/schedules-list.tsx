@@ -57,7 +57,7 @@ export function SchedulesList({
           ownerName={ownerName}
           onEdit={onEdit}
           onDelete={onDelete}
-          onClick={() => nav.push(`/dashboard/schedule?scheduleId=${schedule.id}`)}
+          onClick={() => nav.push(`/dashboard/schedule?scheduleId=${schedule.id}&view=week`)}
         />
       ))}
     </div>

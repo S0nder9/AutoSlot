@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CalendarDays,
   CarFront,
   ChartPie,
@@ -27,7 +26,6 @@ export const dashboardNavigation: DashboardNavigationItem[] = [
   { label: 'Клиенты', href: '/dashboard/clients', icon: UsersRound },
   { label: 'Автомобили', href: '/dashboard/cars', icon: CarFront },
   { label: 'Запчасти', href: '/dashboard/parts', icon: Package },
-  { label: 'Статистика', href: '/dashboard/statistics', icon: BarChart3 },
   { label: 'Аналитика', href: '/dashboard/analytics', icon: ChartPie },
   { label: 'Сервер', href: '/dashboard/server', icon: ServerCog },
   { label: 'Функции', href: '/dashboard/functions', icon: SquareFunction },

@@ -14,10 +14,10 @@ export function useScheduleClientSearch(scheduleId: string, text: string, limit 
     queryKey: scheduleClientKeys.search(scheduleId, debouncedText, limit),
     queryFn: ({ pageParam }) => searchScheduleClients(scheduleId, debouncedText, limit, pageParam),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    getNextPageParam: (page, _pages, offset) => page.hasMore && page.nextOffset !== null && page.nextOffset > offset ? page.nextOffset : undefined,
     enabled: Boolean(scheduleId && debouncedText), staleTime: 30_000, retry: false,
   })
   useEffect(() => { if (query.error) toast.error(getRequestError(query.error, 'Не удалось выполнить поиск клиентов.')) }, [query.error])
   const clients = useMemo(() => query.data?.pages.flatMap(({ items }) => items).filter((item, index, all) => all.findIndex(({ id }) => id === item.id) === index) ?? [], [query.data])
-  return { clients, debouncedText, isSearching: Boolean(text.trim()) && (debouncedText !== text.trim() || (query.isFetching && !query.data)), error: query.error, hasMore: query.hasNextPage, isLoadingMore: query.isFetchingNextPage, loadMore: query.fetchNextPage }
+  return { clients, debouncedText, isSearching: Boolean(text.trim()) && (debouncedText !== text.trim() || (query.isFetching && !query.data)), error: query.error, hasMore: query.hasNextPage, isLoadingMore: query.isFetchingNextPage, refetch: query.refetch, loadMore: () => query.fetchNextPage({ cancelRefetch: false }) }
 }

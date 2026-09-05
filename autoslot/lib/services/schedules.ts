@@ -2,17 +2,9 @@ import { api } from '@/lib/api'
 import type { ApiResponse } from '@/lib/auth-types'
 import type { Schedule } from '@/lib/schedule-types'
 
-let schedulesRequest: Promise<Schedule[]> | null = null
-
-export function getSchedules() {
-  schedulesRequest ??= api
-    .get<ApiResponse<Schedule[]>>('schedules')
-    .then((response) => response.data.data ?? [])
-    .finally(() => {
-      schedulesRequest = null
-    })
-
-  return schedulesRequest
+export async function getSchedules(signal?: AbortSignal) {
+  const response = await api.get<ApiResponse<Schedule[]>>('schedules', { signal })
+  return response.data.data ?? []
 }
 
 export async function createSchedule(name: string) {

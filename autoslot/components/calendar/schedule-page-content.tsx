@@ -30,7 +30,7 @@ export function SchedulePageContent() {
       url.searchParams.set('view', view)
 
       window.history.replaceState(
-        window.history.state,
+        null,
         '',
         `${url.pathname}${url.search}${url.hash}`,
       )

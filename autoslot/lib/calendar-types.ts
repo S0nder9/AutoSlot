@@ -85,6 +85,10 @@ export type UpdateEventJobPayload = {
   clientPrice: number
 }
 
+export type EventJobFormItem = UpdateEventJobPayload & {
+  rowKey: string
+}
+
 export type UpdateEventPartPayload = {
   partId: string
   quantity: number

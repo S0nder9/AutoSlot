@@ -4,4 +4,6 @@ export const scheduleEmployeeKeys = {
     [...scheduleEmployeeKeys.all, scheduleId] as const,
   search: (scheduleId: string, text: string, limit: number) =>
     [...scheduleEmployeeKeys.schedule(scheduleId), 'search', text, limit] as const,
+  detail: (scheduleId: string, employeeId: string) =>
+    [...scheduleEmployeeKeys.schedule(scheduleId), 'detail', employeeId] as const,
 }

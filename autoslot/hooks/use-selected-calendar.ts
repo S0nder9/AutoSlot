@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { InfiniteData } from '@tanstack/react-query'
+import { CanceledError } from 'axios'
+import { getApiSessionVersion } from '@/lib/api'
 import { toast } from 'sonner'
 import type { DragDirection } from 'react-big-calendar/lib/addons/dragAndDrop'
 import type {
@@ -9,7 +12,7 @@ import type {
   CalendarEventSummary,
   CalendarRange,
   CreateEventPayload,
-  SelectedSchedule,
+  EventSearchResult,
   UpdateEventPayload,
 } from '@/lib/calendar-types'
 import { getRequestError } from '@/lib/request-error'
@@ -20,6 +23,7 @@ import {
   serializeEventTimeRange,
 } from '@/lib/event-date-time'
 import { CALENDAR_TIME_STEP_MINUTES } from '@/lib/calendar-navigation'
+import { invalidateScheduleAnalytics } from '@/lib/cache-reconciliation'
 import {
   getScheduleEventRangeFromKey,
   reconcileScheduleEventRange,
@@ -38,6 +42,7 @@ const EVENTS_STALE_TIME = 30 * 1000
 const EVENTS_GC_TIME = 30 * 60 * 1000
 
 type UpdateEventTimeVariables = {
+  sessionVersion: number
   eventId: string
   timeRange: EventApiTimeRange
   errorMessage: string
@@ -53,9 +58,11 @@ export function useSelectedCalendar(
   visibleRange: CalendarRange,
 ) {
   const queryClient = useQueryClient()
-  const [schedule, setSchedule] = useState<SelectedSchedule | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const scheduleQuery = useQuery({ queryKey: ['schedules', scheduleId], queryFn: () => getSchedule(scheduleId), retry: false })
+  const schedule = scheduleQuery.data ?? null
+  const isLoading = scheduleQuery.isPending
   const [isCreating, setIsCreating] = useState(false)
+  const creatingRef = useRef(false)
   const pendingEventIdsRef = useRef(new Set<string>())
   const updatingEventIdsRef = useRef(new Set<string>())
   const deletingEventIdsRef = useRef(new Set<string>())
@@ -77,24 +84,13 @@ export function useSelectedCalendar(
 
   const eventsQuery = useQuery({
     queryKey: activeEventsQueryKey,
-    queryFn: () => getScheduleEvents(scheduleId, visibleRange),
+    queryFn: ({ signal }) => getScheduleEvents(scheduleId, visibleRange, signal),
     staleTime: EVENTS_STALE_TIME,
     gcTime: EVENTS_GC_TIME,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
   })
-
-  useEffect(() => {
-    void getSchedule(scheduleId)
-      .then(setSchedule)
-      .catch((error) => {
-        toast.error(
-          getRequestError(error, 'Не удалось загрузить календарь.'),
-        )
-      })
-      .finally(() => setIsLoading(false))
-  }, [scheduleId])
 
   useEffect(() => {
     if (eventsQuery.error) {
@@ -195,7 +191,7 @@ export function useSelectedCalendar(
       })
 
       for (const [queryKey, cachedEvents] of cachedRanges) {
-        if (!cachedEvents) {
+        if (!getScheduleEventRangeFromKey(queryKey) || !Array.isArray(cachedEvents)) {
           continue
         }
 
@@ -204,17 +200,35 @@ export function useSelectedCalendar(
           cachedEvents.filter((event) => event.id !== eventId),
         )
       }
+      queryClient.setQueriesData<InfiniteData<EventSearchResult, number>>(
+        { queryKey: [...scheduleEventKeys.schedule(scheduleId), 'search'] },
+        (current) => {
+          if (!current) return current
+          let removed = 0
+          const pageParams: number[] = []
+          const pages = current.pages.map((page, index) => {
+            pageParams.push(Math.max(0, current.pageParams[index] - removed))
+            const items = page.items.filter((event) => event.id !== eventId)
+            removed += page.items.length - items.length
+            return { ...page, items, nextOffset: page.nextOffset === null ? null : Math.max(0, page.nextOffset - removed) }
+          })
+          return { ...current, pages, pageParams }
+        },
+      )
     },
     [queryClient, scheduleId],
   )
 
   const { mutate: mutateEventTime } = useMutation({
-    mutationFn: ({ eventId, timeRange }: UpdateEventTimeVariables) =>
-      updateScheduleEventTime(scheduleId, eventId, timeRange),
-    onMutate: async ({ eventId, timeRange }) => {
+    mutationFn: ({ eventId, timeRange, sessionVersion }: UpdateEventTimeVariables) => {
+      if (sessionVersion !== getApiSessionVersion()) throw new CanceledError('Session changed')
+      return updateScheduleEventTime(scheduleId, eventId, timeRange)
+    },
+    onMutate: async ({ eventId, timeRange, sessionVersion }) => {
       await queryClient.cancelQueries({
         queryKey: scheduleEventKeys.schedule(scheduleId),
       })
+      if (sessionVersion !== getApiSessionVersion()) throw new CanceledError('Session changed')
 
       const previousEvents =
         queryClient.getQueryData<CalendarEventSummary[]>(activeEventsQueryKey)
@@ -260,8 +274,10 @@ export function useSelectedCalendar(
 
       toast.error(getRequestError(error, errorMessage))
     },
-    onSuccess: (serverEvent, { eventId }) => {
+    onSuccess: (serverEvent, { eventId, sessionVersion }) => {
+      if (sessionVersion !== getApiSessionVersion()) return
       reconcileCachedEventRanges(serverEvent)
+      void invalidateScheduleAnalytics(queryClient, scheduleId)
 
       confirmedEventTimesRef.current.set(eventId, {
         startTime: serverEvent.startTime,
@@ -294,7 +310,7 @@ export function useSelectedCalendar(
       override: PendingEventTimeOverride,
       errorMessage: string,
     ) => {
-      if (pendingEventIdsRef.current.has(eventId)) {
+      if (pendingEventIdsRef.current.has(eventId) || updatingEventIdsRef.current.has(eventId) || deletingEventIdsRef.current.has(eventId)) {
         return
       }
 
@@ -308,7 +324,7 @@ export function useSelectedCalendar(
       })
       pendingEventIdsRef.current.add(eventId)
       setPendingEventIds(new Set(pendingEventIdsRef.current))
-      mutateEventTime({ eventId, timeRange, errorMessage })
+      mutateEventTime({ eventId, timeRange, errorMessage, sessionVersion: getApiSessionVersion() })
     },
     [mutateEventTime],
   )
@@ -386,12 +402,21 @@ export function useSelectedCalendar(
 
   const createEvent = useCallback(
     async (payload: CreateEventPayload) => {
+      if (creatingRef.current) return false
+      creatingRef.current = true
       setIsCreating(true)
+      const sessionVersion = getApiSessionVersion()
 
       try {
-        await createScheduleEvent(scheduleId, payload)
-        await queryClient.invalidateQueries({
+        const created = await createScheduleEvent(scheduleId, payload)
+        if (!created) throw new Error('Missing created event')
+        await queryClient.cancelQueries({ queryKey: scheduleEventKeys.schedule(scheduleId) })
+        if (sessionVersion !== getApiSessionVersion()) return false
+        reconcileCachedEventRanges(created)
+        void invalidateScheduleAnalytics(queryClient, scheduleId)
+        void queryClient.invalidateQueries({
           queryKey: scheduleEventKeys.schedule(scheduleId),
+          refetchType: 'none',
         })
         toast.success('Событие создано')
         return true
@@ -401,23 +426,25 @@ export function useSelectedCalendar(
         )
         return false
       } finally {
+        creatingRef.current = false
         setIsCreating(false)
       }
     },
-    [queryClient, scheduleId],
+    [queryClient, reconcileCachedEventRanges, scheduleId],
   )
 
   const updateEvent = useCallback(
     async (eventId: string, payload: UpdateEventPayload) => {
       if (
         pendingEventIdsRef.current.has(eventId) ||
-        updatingEventIdsRef.current.has(eventId)
+        updatingEventIdsRef.current.has(eventId) || deletingEventIdsRef.current.has(eventId)
       ) {
         return null
       }
 
       updatingEventIdsRef.current.add(eventId)
       setUpdatingEventIds(new Set(updatingEventIdsRef.current))
+      const sessionVersion = getApiSessionVersion()
 
       try {
         const serverEvent = await updateScheduleEvent(
@@ -434,7 +461,10 @@ export function useSelectedCalendar(
           endTime: serverEvent.endTime,
         }
 
+        await queryClient.cancelQueries({ queryKey: scheduleEventKeys.schedule(scheduleId) })
+        if (sessionVersion !== getApiSessionVersion()) return null
         reconcileCachedEventRanges(calendarSummary)
+        void invalidateScheduleAnalytics(queryClient, scheduleId)
         void queryClient.invalidateQueries({
           queryKey: scheduleEventKeys.schedule(scheduleId),
           refetchType: 'none',
@@ -466,10 +496,14 @@ export function useSelectedCalendar(
 
       deletingEventIdsRef.current.add(eventId)
       setDeletingEventIds(new Set(deletingEventIdsRef.current))
+      const sessionVersion = getApiSessionVersion()
 
       try {
         await deleteScheduleEvent(scheduleId, eventId)
+        await queryClient.cancelQueries({ queryKey: scheduleEventKeys.schedule(scheduleId) })
+        if (sessionVersion !== getApiSessionVersion()) return false
         removeEventFromCachedRanges(eventId)
+        void invalidateScheduleAnalytics(queryClient, scheduleId)
         confirmedEventTimesRef.current.delete(eventId)
         setPendingEventTimeOverrides((currentOverrides) => {
           if (!currentOverrides.has(eventId)) {
@@ -501,6 +535,9 @@ export function useSelectedCalendar(
 
   return {
     schedule,
+    scheduleError: scheduleQuery.error,
+    retrySchedule: scheduleQuery.refetch,
+    eventsError: eventsQuery.error,
     events,
     isLoading,
     isEventsLoading: eventsQuery.isPending,

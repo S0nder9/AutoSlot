@@ -3,16 +3,17 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Workflow } from 'lucide-react'
+import { ChartNoAxesColumn, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Workflow } from 'lucide-react'
 import { DeleteJobDialog } from '@/components/jobs/delete-job-dialog'
 import { JobFormDialog } from '@/components/jobs/job-form-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useScheduleJobs } from '@/hooks/use-schedule-jobs'
 import { useScheduleJobSearch } from '@/hooks/use-schedule-job-search'
 import { useSchedules } from '@/hooks/use-schedules'
 import { formatEventPrice } from '@/lib/format-event'
 import type { Job } from '@/lib/job-types'
+import { entityAnalyticsHref } from '@/lib/entity-analytics-queries'
 
 function formatEstimatedHours(value: number | null) {
   if (value == null) return 'Не указано'
@@ -20,6 +21,11 @@ function formatEstimatedHours(value: number | null) {
 }
 
 export function JobsPageContent() {
+  const scope = useSearchParams().get('scheduleId') ?? ''
+  return <JobsPageScope key={scope} />
+}
+
+function JobsPageScope() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const scheduleId = searchParams.get('scheduleId') ?? ''
@@ -76,7 +82,7 @@ export function JobsPageContent() {
             <Input className="pl-8" placeholder="Поиск работ..." value={search} onChange={(event) => setSearch(event.target.value)} disabled={!scheduleId} />
           </span>
         </label>
-        <Button className="self-end" variant="outline" disabled={!scheduleId || jobs.isFetching} onClick={() => void jobs.refetch()}>
+        <Button className="self-end" variant="outline" disabled={!scheduleId || jobs.isFetching || jobSearch.isSearching || jobSearch.isLoadingMore} onClick={() => void (search.trim() ? jobSearch.refetch() : jobs.refetch())}>
           <RefreshCw className={jobs.isFetching ? 'animate-spin' : undefined} /> Обновить
         </Button>
       </div>
@@ -92,7 +98,7 @@ export function JobsPageContent() {
       ) : jobs.error ? (
         <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-background px-6 text-center">
           <h2 className="text-lg font-semibold">Не удалось загрузить работы</h2>
-          <Button className="mt-4" variant="outline" onClick={() => void jobs.refetch()}>Повторить</Button>
+          <Button className="mt-4" variant="outline" onClick={() => void (search.trim() ? jobSearch.refetch() : jobs.refetch())}>Повторить</Button>
         </div>
       ) : jobs.jobs.length === 0 ? (
         <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-background px-6 text-center">
@@ -122,6 +128,7 @@ export function JobsPageContent() {
                     <td className="px-4 py-3">{formatEstimatedHours(job.estimatedHours)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <Link href={entityAnalyticsHref('jobs', scheduleId, job.id)} className={buttonVariants({ size: 'sm', variant: 'outline' })}><ChartNoAxesColumn /> Статистика</Link>
                         <Button size="sm" variant="outline" onClick={() => setDialogJob(job)}><Pencil /> Редактировать</Button>
                         <Button size="sm" variant="destructive" aria-label={`Удалить работу «${job.name}»`} onClick={() => setJobToDelete(job)}><Trash2 /> Удалить</Button>
                       </div>

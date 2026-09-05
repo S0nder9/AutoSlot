@@ -30,9 +30,17 @@ export function formatEventDuration(startValue: string, endValue: string) {
 }
 
 export function formatEventPrice(value: number) {
+  if (!Number.isFinite(value)) return '—'
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency: 'RUB',
     maximumFractionDigits: 2,
   }).format(value)
+}
+
+export function formatPercentage(value: number, maximumFractionDigits = 1) {
+  return `${new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits,
+  }).format(value)}%`
 }

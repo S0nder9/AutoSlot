@@ -1,18 +1,25 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
+import { BarChart3, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
 import { DeleteEmployeeDialog } from '@/components/employees/delete-employee-dialog'
 import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useScheduleEmployees } from '@/hooks/use-schedule-employees'
 import { useScheduleEmployeeSearch } from '@/hooks/use-schedule-employee-search'
 import { useSchedules } from '@/hooks/use-schedules'
 import { formatEmployeeName, type Employee } from '@/lib/employee-types'
+import { employeeAnalyticsHref } from '@/lib/employee-statistics-queries'
 
 export function EmployeesPageContent() {
+  const scope = useSearchParams().get('scheduleId') ?? ''
+  return <EmployeesPageScope key={scope} />
+}
+
+function EmployeesPageScope() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const scheduleId = searchParams.get('scheduleId') ?? ''
@@ -69,7 +76,7 @@ export function EmployeesPageContent() {
             <Input className="pl-8" placeholder="Поиск сотрудников..." value={search} onChange={(event) => setSearch(event.target.value)} disabled={!scheduleId} />
           </span>
         </label>
-        <Button className="self-end" variant="outline" disabled={!scheduleId || employees.isFetching} onClick={() => void employees.refetch()}><RefreshCw className={employees.isFetching ? 'animate-spin' : undefined} /> Обновить</Button>
+        <Button className="self-end" variant="outline" disabled={!scheduleId || employees.isFetching || employeeSearch.isSearching || employeeSearch.isLoadingMore} onClick={() => void (search.trim() ? employeeSearch.refetch() : employees.refetch())}><RefreshCw className={employees.isFetching ? 'animate-spin' : undefined} /> Обновить</Button>
       </div>
 
       {!scheduleId ? (
@@ -83,7 +90,7 @@ export function EmployeesPageContent() {
       ) : employees.error ? (
         <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-background px-6 text-center">
           <h2 className="text-lg font-semibold">Не удалось загрузить сотрудников</h2>
-          <Button className="mt-4" variant="outline" onClick={() => void employees.refetch()}>Повторить</Button>
+          <Button className="mt-4" variant="outline" onClick={() => void (search.trim() ? employeeSearch.refetch() : employees.refetch())}>Повторить</Button>
         </div>
       ) : employees.employees.length === 0 ? (
         <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-background px-6 text-center">
@@ -109,6 +116,7 @@ export function EmployeesPageContent() {
                     <td className="px-4 py-3">{employee.middleName || '—'}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <Link href={employeeAnalyticsHref(scheduleId, employee.id)} className={buttonVariants({ size: 'sm', variant: 'outline' })}><BarChart3 /> Статистика</Link>
                         <Button size="sm" variant="outline" onClick={() => setDialogEmployee(employee)}><Pencil /> Редактировать</Button>
                         <Button size="sm" variant="destructive" aria-label={`Удалить сотрудника «${formatEmployeeName(employee)}»`} onClick={() => setEmployeeToDelete(employee)}><Trash2 /> Удалить</Button>
                       </div>

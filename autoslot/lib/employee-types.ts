@@ -1,5 +1,6 @@
 export type Employee = {
   id: string
+  workPercent: number
   firstName: string
   middleName: string | null
   lastName: string | null
@@ -9,6 +10,7 @@ export type Employee = {
 }
 
 export type EmployeePayload = {
+  workPercent?: number
   firstName: string
   middleName: string | null
   lastName: string | null

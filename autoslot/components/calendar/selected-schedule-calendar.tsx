@@ -55,8 +55,8 @@ export function SelectedScheduleCalendar({
   initialView,
   onCalendarStateChange,
 }: SelectedScheduleCalendarProps) {
-  const [date, setDate] = useState(initialDate)
-  const [view, setView] = useState(initialView)
+  const date = initialDate
+  const view = initialView
   const [eventSearchText, setEventSearchText] = useState('')
   const eventSearch = useScheduleEventSearch(scheduleId, eventSearchText)
   const [selectedCreateRange, setSelectedCreateRange] =
@@ -93,7 +93,6 @@ export function SelectedScheduleCalendar({
 
   const handleNavigate = useCallback(
     (nextDate: Date) => {
-      setDate(nextDate)
       onCalendarStateChange(nextDate, view)
     },
     [onCalendarStateChange, view],
@@ -101,7 +100,6 @@ export function SelectedScheduleCalendar({
 
   const handleViewChange = useCallback(
     (nextView: CalendarView) => {
-      setView(nextView)
       onCalendarStateChange(date, nextView)
     },
     [date, onCalendarStateChange],
@@ -207,13 +205,14 @@ export function SelectedScheduleCalendar({
     return (
       <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
         <h1 className="text-2xl font-semibold">Календарь не найден</h1>
+        {calendar.scheduleError && <Button className="mt-5 mr-3" variant="outline" onClick={() => void calendar.retrySchedule()}>Повторить загрузку</Button>}
         <Button className="mt-5" variant="outline" nativeButton={false} render={<Link href="/dashboard/schedule">Вернуться к календарям</Link>} />
       </main>
     )
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="w-full max-w-none px-2 py-4 sm:px-4 sm:py-6 lg:px-5">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button size="icon" variant="outline" nativeButton={false} render={<Link href="/dashboard/schedule" aria-label="Назад к календарям"><ArrowLeft /></Link>} />
@@ -224,11 +223,11 @@ export function SelectedScheduleCalendar({
             <p className="text-sm text-muted-foreground">Планирование записей автосервиса</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="relative w-full sm:w-72">
+        <div className="grid w-full grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+          <div className="relative w-full min-[380px]:col-span-2 sm:w-72">
             <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-8"
+              className="h-10 pl-8 sm:h-8"
               placeholder="Поиск событий..."
               value={eventSearchText}
               onChange={(event) => setEventSearchText(event.target.value)}
@@ -262,6 +261,7 @@ export function SelectedScheduleCalendar({
             )}
           </div>
           <Button
+            className="h-10 sm:h-8"
             variant="outline"
             disabled={calendar.isEventsFetching}
             onClick={() => void calendar.refreshEvents()}
@@ -271,14 +271,15 @@ export function SelectedScheduleCalendar({
             />
             Обновить
           </Button>
-          <Button onClick={openDefaultCreateDialog}>
+          <Button className="h-10 sm:h-8" onClick={openDefaultCreateDialog}>
           <Plus />
           Создать событие
           </Button>
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border bg-background p-3 shadow-sm sm:p-5">
+      <div className="relative w-full overflow-x-auto rounded-xl border bg-background p-2 shadow-sm sm:p-3">
+        {calendar.eventsError && <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">Не удалось загрузить события.<Button variant="outline" onClick={() => void calendar.refreshEvents()}>Повторить</Button></div>}
         {calendar.isEventsLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
             <Loader2 className="size-7 animate-spin" />

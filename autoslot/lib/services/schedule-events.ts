@@ -20,10 +20,12 @@ export async function getSchedule(id: string) {
 export async function getScheduleEvents(
   id: string,
   range: CalendarRange,
+  signal?: AbortSignal,
 ): Promise<CalendarEventSummary[]> {
   const response = await api.get<ApiResponse<CalendarEventSummary[]>>(
     `schedules/${id}/events`,
     {
+      signal,
       params: {
         startTime: range.start.toISOString(),
         endTime: range.end.toISOString(),

@@ -5,16 +5,22 @@ import { ProtectedRoute } from '@/components/auth/protected-route'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar'
 import { useDashboardSession } from '@/hooks/use-dashboard-session'
+import { useDesktopSidebar } from '@/hooks/use-desktop-sidebar'
 import { useMobileSidebar } from '@/hooks/use-mobile-sidebar'
+import { cn } from '@/lib/utils'
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const session = useDashboardSession()
   const sidebar = useMobileSidebar()
+  const desktopSidebar = useDesktopSidebar()
 
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen bg-muted/20">
-        <DashboardSidebar />
+        <DashboardSidebar
+          collapsed={desktopSidebar.isCollapsed}
+          onCollapseToggle={desktopSidebar.toggle}
+        />
 
         {sidebar.isOpen && (
           <div className="fixed inset-0 z-50 flex lg:hidden">
@@ -28,7 +34,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <div className="min-w-0 flex-1 ип">
+        <div
+          className={cn(
+            'min-w-0 flex-1 transition-[margin] duration-200',
+            desktopSidebar.isCollapsed ? 'lg:ml-20' : 'lg:ml-64',
+          )}
+        >
           <DashboardHeader
             user={session.user}
             isLoggingOut={session.isLoggingOut}

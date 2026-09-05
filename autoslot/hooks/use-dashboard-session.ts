@@ -3,6 +3,8 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
+import { toast } from 'sonner'
+import { getRequestError } from '@/lib/request-error'
 
 export function useDashboardSession() {
   const { user, logout } = useAuth()
@@ -13,6 +15,8 @@ export function useDashboardSession() {
     setIsLoggingOut(true)
     try {
       await logout()
+    } catch (error) {
+      toast.error(getRequestError(error, 'Сеанс на устройстве завершён. Не удалось подтвердить выход на сервере.'))
     } finally {
       router.replace('/auth/login')
       setIsLoggingOut(false)

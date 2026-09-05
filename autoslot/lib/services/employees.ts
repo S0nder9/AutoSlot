@@ -13,6 +13,15 @@ export async function getScheduleEmployees(scheduleId: string) {
   return response.data.data ?? []
 }
 
+export async function getScheduleEmployee(scheduleId: string, employeeId: string, signal?: AbortSignal) {
+  const response = await api.get<ApiResponse<Employee>>(
+    `schedules/${scheduleId}/employees/${employeeId}`,
+    { signal },
+  )
+  if (!response.data.data) throw new Error('Invalid employee response')
+  return response.data.data
+}
+
 export async function searchScheduleEmployees(
   scheduleId: string,
   text: string,

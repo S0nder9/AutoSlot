@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 import type { Job, JobPayload } from '@/lib/job-types'
+import { parseDecimalInput } from '@/lib/validations/money'
 import {
   jobFormSchema,
   type JobFormValues,
@@ -54,10 +55,10 @@ export function useJobForm(
         description: values.description,
         basePrice: values.basePrice.trim() === ''
           ? Number.NaN
-          : Number(values.basePrice),
+          : parseDecimalInput(values.basePrice),
         estimatedHours: values.estimatedHours.trim() === ''
           ? null
-          : Number(values.estimatedHours),
+          : parseDecimalInput(values.estimatedHours),
       })
 
       if (!parsed.success) {

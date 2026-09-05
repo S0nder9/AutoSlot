@@ -1,5 +1,11 @@
-import { DashboardPlaceholder } from '@/components/dashboard/dashboard-placeholder'
+import { redirect } from 'next/navigation'
 
-export default function StatisticsPage() {
-  return <DashboardPlaceholder title="Статистика" />
+export default async function StatisticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const source = await searchParams
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(source)) {
+    if (Array.isArray(value)) value.forEach((item) => params.append(key, item))
+    else if (value !== undefined) params.set(key, value)
+  }
+  redirect(`/dashboard/analytics${params.size ? `?${params}` : ''}`)
 }

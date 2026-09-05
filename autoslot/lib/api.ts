@@ -3,8 +3,10 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
+  baseURL: configuredApiUrl || '/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -14,6 +16,7 @@ export const api = axios.create({
 
 type RetryableRequest = InternalAxiosRequestConfig & {
   _retry?: boolean
+  _sessionVersion?: number
 }
 
 const refreshExcludedPaths = [
@@ -25,6 +28,21 @@ const refreshExcludedPaths = [
 let refreshPromise: Promise<void> | null = null
 let unauthorizedHandler: (() => void) | null = null
 let refreshSuccessHandler: (() => void) | null = null
+let sessionVersion = 0
+
+export const getApiSessionVersion = () => sessionVersion
+
+// Ignore late responses from a previous account, including mutation callbacks.
+export function invalidateApiSession() {
+  sessionVersion += 1
+  refreshPromise = null
+}
+
+api.interceptors.request.use((request: RetryableRequest) => {
+  request._sessionVersion ??= sessionVersion
+  if (request._sessionVersion !== sessionVersion) throw new axios.CanceledError('Session changed')
+  return request
+})
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler
@@ -35,20 +53,23 @@ export function setRefreshSuccessHandler(handler: (() => void) | null) {
 }
 
 export function refreshAccessToken(): Promise<void> {
-  refreshPromise ??= api
+  if (refreshPromise) return refreshPromise
+  const version = sessionVersion
+  const pending = api
     .post('auth/refresh-tokens')
     .then(() => {
-      refreshSuccessHandler?.()
+      if (version === sessionVersion) refreshSuccessHandler?.()
     })
     .catch((refreshError) => {
-      unauthorizedHandler?.()
+      if (version === sessionVersion) unauthorizedHandler?.()
       throw refreshError
     })
     .finally(() => {
-      refreshPromise = null
+      if (refreshPromise === pending) refreshPromise = null
     })
 
-  return refreshPromise
+  refreshPromise = pending
+  return pending
 }
 
 function isRefreshExcluded(url?: string) {
@@ -56,9 +77,17 @@ function isRefreshExcluded(url?: string) {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if ((response.config as RetryableRequest)._sessionVersion !== sessionVersion) {
+      throw new axios.CanceledError('Session changed')
+    }
+    return response
+  },
   async (error: AxiosError) => {
     const request = error.config as RetryableRequest | undefined
+    if (request && request._sessionVersion !== sessionVersion) {
+      return Promise.reject(new axios.CanceledError('Session changed'))
+    }
 
     if (
       !request ||

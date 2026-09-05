@@ -15,7 +15,7 @@ export function useSchedulePartSearch(scheduleId: string, text: string, limit = 
     queryKey: schedulePartKeys.search(scheduleId, debouncedText, limit),
     queryFn: ({ pageParam }) => searchScheduleParts(scheduleId, debouncedText, limit, pageParam),
     initialPageParam: 0,
-    getNextPageParam: (page) => page.nextOffset ?? undefined,
+    getNextPageParam: (page, _pages, offset) => page.hasMore && page.nextOffset !== null && page.nextOffset > offset ? page.nextOffset : undefined,
     enabled: Boolean(scheduleId && debouncedText),
     staleTime: 30_000,
     retry: false,
@@ -39,6 +39,6 @@ export function useSchedulePartSearch(scheduleId: string, text: string, limit = 
     error: query.error,
     hasMore: query.hasNextPage,
     isLoadingMore: query.isFetchingNextPage,
-    loadMore: query.fetchNextPage,
+    refetch: query.refetch, loadMore: () => query.fetchNextPage({ cancelRefetch: false }),
   }
 }
