@@ -1,5 +1,5 @@
-import { DashboardPlaceholder } from '@/components/dashboard/dashboard-placeholder'
+import { ServerStatusPage } from '@/components/server/server-status-page'
 
 export default function ServerPage() {
-  return <DashboardPlaceholder title="Сервер" />
+  return <ServerStatusPage />
 }

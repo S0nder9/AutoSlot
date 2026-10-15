@@ -73,4 +73,18 @@ npm run build
 git diff --check
 ```
 
-Production-сборка на Vercel намеренно завершается ошибкой, если не задан ни `API_PROXY_TARGET`, ни HTTPS `NEXT_PUBLIC_API_URL`, либо если production API указывает на localhost/HTTP.
+Production-сборка на Vercel и Netlify намеренно завершается ошибкой, если не задан ни `API_PROXY_TARGET`, ни HTTPS `NEXT_PUBLIC_API_URL`, либо если production API указывает на localhost/HTTP.
+
+## Развёртывание на Netlify
+
+В корне репозитория уже добавлен `netlify.toml`: он выбирает `autoslot` как Base directory, использует Node.js 24, выполняет `npm run build` и публикует `.next`. Netlify автоматически подключает актуальный Next.js adapter для SSR/App Router.
+
+В Netlify → Site configuration → Environment variables добавьте `API_PROXY_TARGET` для Production и Deploy previews:
+
+```env
+API_PROXY_TARGET=https://your-api-domain.example/api
+```
+
+Не добавляйте `NEXT_PUBLIC_API_URL` при использовании proxy. Netlify-сборка завершится ошибкой без production API URL или если он указывает на `http://localhost`; это позволяет обнаружить неправильную конфигурацию до публикации.
+
+После сохранения переменной запустите новый deploy. Backend должен разрешать запросы с домена Netlify и поддерживать credentials/cookie для auth.

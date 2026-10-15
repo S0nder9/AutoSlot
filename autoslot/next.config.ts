@@ -13,15 +13,17 @@ function validateHttpsApiUrl(name: string, value: string) {
   }
 
   if (url.protocol !== "https:") {
-    throw new Error(`${name} must use HTTPS on Vercel.`);
+    throw new Error(`${name} must use HTTPS in production.`);
   }
 
   if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-    throw new Error(`${name} cannot point to localhost on Vercel.`);
+    throw new Error(`${name} cannot point to localhost in production.`);
   }
 }
 
-if (process.env.VERCEL === "1") {
+const isHostedBuild = process.env.VERCEL === "1" || process.env.NETLIFY === "true";
+
+if (isHostedBuild) {
   if (apiProxyTarget) {
     validateHttpsApiUrl("API_PROXY_TARGET", apiProxyTarget);
 
@@ -34,7 +36,7 @@ if (process.env.VERCEL === "1") {
     validateHttpsApiUrl("NEXT_PUBLIC_API_URL", publicApiUrl);
   } else {
     throw new Error(
-      "Set API_PROXY_TARGET in Vercel, or provide an HTTPS NEXT_PUBLIC_API_URL.",
+      "Set API_PROXY_TARGET in the hosting provider, or provide an HTTPS NEXT_PUBLIC_API_URL.",
     );
   }
 }
